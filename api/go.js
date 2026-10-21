@@ -15,7 +15,7 @@ function naoEncontrado(res) {
   res.statusCode = 404;
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
-  res.end('<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Link não encontrado</title><link rel="stylesheet" href="/css/estilo.css"><body class="centro"><main class="cartao"><h1>Link não encontrado</h1><p>Este link não existe ou foi desativado.</p></main></body></html>');
+  res.end('<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Link não encontrado</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Marcellus&display=swap"><link rel="stylesheet" href="/css/estilo.css"><body><main class="estado"><p class="eyebrow">PHAR Links</p><h1>Link não encontrado</h1><p>Este link não existe ou foi desativado por quem o criou.</p></main></body></html>');
 }
 
 module.exports = async (req, res) => {

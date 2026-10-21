@@ -2,87 +2,126 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>Meus links · PHAR Links</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&amp;family=Marcellus&amp;display=swap">
 <link rel="stylesheet" href="/css/estilo.css">
+<title>Links | PHAR Links</title>
+<meta name="robots" content="noindex">
 </head>
 <body>
-<header class="topo">
-  <strong>PHAR Links <span id="nome-empresa" class="selo oculto"></span></strong>
-  <nav>
-    <a href="/admin" id="link-admin" class="oculto">Administração</a>
-    <span id="email-usuario"></span>
-    <button class="link" id="sair" type="button">Sair</button>
-  </nav>
-</header>
 
-<main class="conteudo">
-  <section id="tela-carregando"><p>Carregando…</p></section>
+<div class="estado" id="tela-carregando"><p class="dica">Carregando…</p></div>
 
-  <section id="tela-sem-empresa" class="oculto">
-    <div class="cartao">
-      <h2>Cadastre sua empresa</h2>
-      <p>Falta só o nome da empresa para enviar seu cadastro para aprovação.</p>
-      <form id="form-empresa">
-        <label for="nova-empresa">Nome da empresa</label>
-        <input id="nova-empresa" required minlength="2" maxlength="120">
-        <button class="principal largo" type="submit">Enviar cadastro</button>
-      </form>
-      <div id="msg-empresa" class="msg"></div>
-    </div>
-  </section>
+<div class="estado" id="tela-estado" hidden>
+  <p class="eyebrow">PHAR Links</p>
+  <h1 id="estado-titulo"></h1>
+  <p id="estado-texto"></p>
+  <div class="acoes">
+    <button class="btn btn-primary" type="button" id="estado-atualizar">Verificar de novo</button>
+    <button class="btn btn-sec" type="button" data-sair>Sair</button>
+  </div>
+</div>
 
-  <section id="tela-pendente" class="oculto">
-    <div class="aviso"><h2>Cadastro em análise</h2><p>Sua empresa foi cadastrada e está aguardando liberação. Assim que for aprovada, é só atualizar esta página.</p></div>
-  </section>
+<div class="estado" id="tela-sem-empresa" hidden>
+  <p class="eyebrow">PHAR Links</p>
+  <h1>Falta o nome da sua empresa</h1>
+  <p>Informe o nome da empresa para enviar o cadastro para liberação.</p>
+  <form id="form-empresa" novalidate class="acoes">
+    <div class="campo"><label for="nova-empresa">Nome da empresa</label><input type="text" id="nova-empresa" maxlength="120" required></div>
+    <button class="btn btn-primary" type="submit">Enviar cadastro</button>
+    <button class="btn btn-sec" type="button" data-sair>Sair</button>
+  </form>
+  <p class="erro" id="erro-empresa" role="alert" hidden></p>
+</div>
 
-  <section id="tela-bloqueada" class="oculto">
-    <div class="aviso"><h2>Acesso suspenso</h2><p>O acesso desta empresa está suspenso e os links dela não redirecionam. Fale com o suporte da PHAR Consultoria.</p></div>
-  </section>
-
-  <section id="tela-links" class="oculto">
-    <div class="barra">
-      <input id="busca" type="search" placeholder="Buscar por nome, endereço ou destino">
-      <button class="principal" id="novo" type="button">+ Novo link</button>
-    </div>
-    <div id="lista" class="lista"></div>
-  </section>
-</main>
-
-<dialog id="janela">
-  <form id="form-link">
-    <h2 id="janela-titulo">Novo link</h2>
-    <label for="f-nome">Nome (só para você identificar)</label>
-    <input id="f-nome" required maxlength="120" placeholder="Ex.: Instagram bio outubro">
-    <label for="f-slug">Endereço curto</label>
-    <div class="prefixo"><span id="f-prefixo"></span><input id="f-slug" required maxlength="50" pattern="[a-z0-9][a-z0-9\-]*" placeholder="promo"></div>
-    <label for="f-destino">Destino (para onde o link leva)</label>
-    <input id="f-destino" type="url" required placeholder="https://seusite.com.br/pagina">
-    <fieldset>
-      <legend>UTMs (opcional)</legend>
-      <div class="grade">
-        <div><label for="f-utm_source">Origem (utm_source)</label><input id="f-utm_source" maxlength="100" placeholder="instagram"></div>
-        <div><label for="f-utm_medium">Mídia (utm_medium)</label><input id="f-utm_medium" maxlength="100" placeholder="social"></div>
-        <div><label for="f-utm_campaign">Campanha (utm_campaign)</label><input id="f-utm_campaign" maxlength="100" placeholder="black-friday"></div>
-        <div><label for="f-utm_content">Conteúdo (utm_content)</label><input id="f-utm_content" maxlength="100" placeholder="bio"></div>
-        <div><label for="f-utm_term">Termo (utm_term)</label><input id="f-utm_term" maxlength="100"></div>
+<div id="tela-app" hidden>
+  <header class="band inverse">
+    <div class="wrap">
+      <div class="topo">
+        <a class="marca" href="/app"><span>PHAR Links</span><span class="ponto-marca" aria-hidden="true"></span></a>
+        <div class="topo-acoes">
+          <span class="topo-empresa" id="topo-empresa"></span>
+          <span class="topo-nome" id="topo-email"></span>
+          <a class="topo-link" href="/admin" id="link-admin" hidden>Painel admin</a>
+          <button class="topo-link" type="button" data-sair>Sair</button>
+        </div>
       </div>
-    </fieldset>
-    <label class="check"><input type="checkbox" id="f-ativo" checked> Link ativo</label>
-    <div class="previa">Vai abrir: <span id="f-previa"></span></div>
-    <div id="bloco-cliques" class="oculto">
-      <label>Cliques nos últimos 30 dias: <span id="total-30"></span></label>
-      <div class="grafico" id="grafico"></div>
+      <div class="band-top">
+        <div>
+          <h1>Links</h1>
+          <p class="band-sub">Seus links curtos, as UTMs de cada um e para onde eles levam agora.</p>
+        </div>
+        <button class="btn btn-accent" type="button" id="btn-novo">Novo link</button>
+      </div>
+      <div class="stats" role="group" aria-label="Resumo">
+        <div class="stat"><b id="n-ativos">–</b><span>Links ativos</span></div>
+        <div class="stat"><b id="n-pausados">–</b><span>Pausados</span></div>
+        <div class="stat"><b id="n-hoje">–</b><span>Cliques hoje</span></div>
+        <div class="stat"><b id="n-total">–</b><span>Cliques no total</span></div>
+      </div>
     </div>
-    <div id="msg-link" class="msg"></div>
-    <div class="rodape">
-      <button class="perigo" id="excluir" type="button">Excluir</button>
-      <div><button id="cancelar" type="button">Cancelar</button><button class="principal" type="submit">Salvar</button></div>
+  </header>
+
+  <main class="wrap sistema">
+    <div class="aviso aviso-erro" id="aviso-erro" role="alert" hidden></div>
+    <div class="toolbar">
+      <div class="campo busca"><label for="busca">Buscar</label><input type="search" id="busca" placeholder="Nome, endereço curto ou destino"></div>
+      <div class="campo"><label for="filtro">Situação</label>
+        <select id="filtro"><option value="">Todos</option><option value="ativos">Ativos</option><option value="pausados">Pausados</option></select>
+      </div>
+    </div>
+    <div class="resumo" id="resumo"></div>
+    <div class="lista-head" aria-hidden="true"><div>Link</div><div>Destino</div><div>Situação</div><div>Cliques</div><div></div></div>
+    <div class="lista" id="lista"></div>
+  </main>
+</div>
+
+<dialog id="dlg-link" aria-labelledby="dlg-titulo">
+  <form id="form-link" novalidate>
+    <div class="dlg-head">
+      <h2 id="dlg-titulo">Novo link</h2>
+      <button class="fechar" type="button" id="dlg-fechar" aria-label="Fechar">×</button>
+    </div>
+    <div class="dlg-body">
+      <div class="grid">
+        <div class="campo col-2"><label for="f-nome">Nome</label><input type="text" id="f-nome" maxlength="120" required placeholder="Ex.: Bio do Instagram"><p class="dica">Só para você identificar. Ninguém vê esse nome.</p></div>
+        <div class="campo col-2"><label for="f-slug">Endereço curto</label><div class="prefixo"><span id="f-prefixo"></span><input type="text" id="f-slug" maxlength="50" required placeholder="promo" autocomplete="off" autocapitalize="off"></div></div>
+        <div class="campo col-2"><label for="f-destino">Destino</label><input type="text" inputmode="url" id="f-destino" required placeholder="https://seusite.com.br/pagina"><p class="dica">Pode trocar depois: o link curto continua o mesmo.</p></div>
+      </div>
+
+      <div class="secao">
+        <h3>UTMs (opcional)</h3>
+        <div class="grid">
+          <div class="campo"><label for="f-utm_source">Origem · utm_source</label><input type="text" id="f-utm_source" maxlength="100" placeholder="instagram"></div>
+          <div class="campo"><label for="f-utm_medium">Mídia · utm_medium</label><input type="text" id="f-utm_medium" maxlength="100" placeholder="social"></div>
+          <div class="campo"><label for="f-utm_campaign">Campanha · utm_campaign</label><input type="text" id="f-utm_campaign" maxlength="100" placeholder="black-friday"></div>
+          <div class="campo"><label for="f-utm_content">Conteúdo · utm_content</label><input type="text" id="f-utm_content" maxlength="100" placeholder="bio"></div>
+          <div class="campo"><label for="f-utm_term">Termo · utm_term</label><input type="text" id="f-utm_term" maxlength="100"></div>
+        </div>
+        <p class="lk-previa"><b>Vai abrir:</b> <span id="f-previa">—</span></p>
+        <label class="caixa"><input type="checkbox" id="f-ativo" checked><span>Link ativo<small>Desmarque para pausar sem apagar.</small></span></label>
+      </div>
+
+      <div class="secao" id="secao-cliques" hidden>
+        <h3>Cliques nos últimos 30 dias · <span id="total-30"></span></h3>
+        <div class="lk-barras" id="barras"></div>
+        <div class="lk-barras-eixo"><span id="eixo-ini"></span><span>hoje</span></div>
+      </div>
+
+      <p class="erro" id="erro-link" role="alert" hidden></p>
+      <div class="acoes">
+        <button class="btn btn-danger" type="button" id="btn-excluir" hidden>Excluir</button>
+        <button class="btn btn-sec empurra" type="button" id="btn-cancelar">Cancelar</button>
+        <button class="btn btn-primary" type="submit" id="btn-salvar">Salvar</button>
+      </div>
     </div>
   </form>
 </dialog>
 
+<p id="toast" role="status" aria-live="polite"></p>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="/js/config.js"></script>
 <script src="/js/app.js"></script>

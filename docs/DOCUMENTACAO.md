@@ -6,7 +6,7 @@ Encurtador de links com UTM e destino editável, para várias empresas clientes.
 
 ## Endereços
 - Sistema e links curtos: https://links.pharconsultoria.com
-  - `/entrar` login e cadastro · `/app` painel de links · `/admin` administração · `/<slug>` redireciona
+  - `/` página inicial · `/entrar` login, cadastro e recuperação de senha · `/app` painel de links · `/admin` administração · `/<slug>` redireciona
 - Código: GitHub `Dev-for-px/phar-links` (privado), branch `main`. Cada push publica na Vercel.
 - Banco e login: Supabase, projeto `phar-links` (id `uqmjjrrpdgtjgzzjyxtn`, região São Paulo, plano gratuito), organização pedrodadila.
 - Domínio: Cloudflare, registro CNAME `links` → `cname.vercel-dns.com`, só DNS (nuvem cinza).
@@ -18,6 +18,10 @@ Encurtador de links com UTM e destino editável, para várias empresas clientes.
 3. Com a empresa liberada, o painel `/app` permite criar, buscar, copiar, editar, pausar (desmarcar "Link ativo") e excluir links.
 4. Cada link tem: nome interno, endereço curto (slug), destino e as 5 UTMs. A tela mostra a URL final antes de salvar.
 5. Clique em `/<slug>`: a função `api/go.js` chama `resolver_link` no banco, que soma o clique e devolve destino + UTMs. A função monta a URL (mantendo parâmetros que o destino já tinha) e redireciona com 302, sem cache, para a troca de destino valer na hora.
+
+## Visual
+- Mesma base visual do PHAR Prospector (Design System da PHAR Consultoria): `public/css/estilo.css` copiado de lá, com um bloco "PHAR Links" no fim; `public/js/grade.js` (grade de pontos) e `public/favicon.svg` também vêm de lá.
+- Telas: página inicial (`index.html`), entrar com abas Entrar/Criar conta e recuperação de senha, sistema com faixa azul (resumo: ativos, pausados, cliques hoje, total), lista de links, janela de edição com gráfico de 30 dias, e painel admin com Liberar/Suspender/Reativar.
 
 ## Banco
 - `empresas` (nome, situação: pendente/ativa/bloqueada)
@@ -54,4 +58,5 @@ Encurtador de links com UTM e destino editável, para várias empresas clientes.
 - Cobrança e assinatura; QR Code por link (ideias futuras).
 
 ## Histórico
+- 21/10/2026 — telas no padrão do PHAR Prospector, página inicial e recuperação de senha.
 - 21/10/2026 — primeira versão: cadastro com aprovação, links com UTM e destino editável, contador total e por dia, administração de empresas.

@@ -2,25 +2,53 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>Administração · PHAR Links</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&amp;family=Marcellus&amp;display=swap">
 <link rel="stylesheet" href="/css/estilo.css">
+<title>Painel admin | PHAR Links</title>
+<meta name="robots" content="noindex">
 </head>
 <body>
-<header class="topo">
-  <strong>PHAR Links · Administração</strong>
-  <nav><a href="/app">Meus links</a><button class="link" id="sair" type="button">Sair</button></nav>
-</header>
-<main class="conteudo">
-  <h2>Empresas</h2>
-  <p>Libere, suspenda ou reative o acesso. Empresa suspensa não entra no sistema e os links dela param de redirecionar.</p>
-  <div id="msg" class="msg"></div>
-  <table>
-    <thead><tr><th>Empresa</th><th>Responsável</th><th>Links</th><th>Cliques</th><th>Desde</th><th>Situação</th></tr></thead>
-    <tbody id="tabela"></tbody>
-  </table>
-</main>
+
+<div class="estado" id="tela-carregando"><p class="dica">Carregando…</p></div>
+
+<div id="tela-admin" hidden>
+  <header class="band inverse">
+    <div class="wrap">
+      <div class="topo">
+        <a class="marca" href="/admin"><span>PHAR Links</span><span class="ponto-marca" aria-hidden="true"></span></a>
+        <div class="topo-acoes">
+          <span class="topo-nome" id="topo-email"></span>
+          <a class="topo-link" href="/app">Meus links</a>
+          <button class="topo-link" type="button" data-sair>Sair</button>
+        </div>
+      </div>
+      <div class="band-top">
+        <div>
+          <h1>Painel admin</h1>
+          <p class="band-sub">Libere empresas novas e suspenda ou reative o acesso. Empresa suspensa não entra e os links dela param de redirecionar.</p>
+        </div>
+      </div>
+      <div class="stats" role="group" aria-label="Resumo">
+        <div class="stat"><b id="n-pendentes">–</b><span>Aguardando liberação</span></div>
+        <div class="stat"><b id="n-ativas">–</b><span>Empresas liberadas</span></div>
+        <div class="stat"><b id="n-links">–</b><span>Links no sistema</span></div>
+        <div class="stat"><b id="n-cliques">–</b><span>Cliques no total</span></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap sistema">
+    <div class="aviso aviso-erro" id="aviso-erro" role="alert" hidden></div>
+    <div class="adm-head lk" aria-hidden="true"><div>Empresa</div><div>Responsável</div><div>Situação</div><div>Links</div><div>Cliques</div><div></div></div>
+    <div class="lista" id="lista"></div>
+  </main>
+</div>
+
+<p id="toast" role="status" aria-live="polite"></p>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="/js/config.js"></script>
 <script src="/js/admin.js"></script>

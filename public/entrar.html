@@ -2,31 +2,94 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>Entrar · PHAR Links</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&amp;family=Marcellus&amp;display=swap">
 <link rel="stylesheet" href="/css/estilo.css">
+<title>Entrar | PHAR Links</title>
+<meta name="robots" content="noindex">
 </head>
-<body class="centro">
-<main class="cartao">
-  <h1 id="titulo">Entrar</h1>
-  <p id="sub">Acesse seus links curtos.</p>
-  <form id="form">
-    <div id="campo-empresa" class="oculto">
-      <label for="empresa">Nome da empresa</label>
-      <input id="empresa" autocomplete="organization">
+<body>
+<div class="pagina-auth">
+  <aside class="auth-lado inverse">
+    <a class="marca" href="/"><span>PHAR Links</span><span class="ponto-marca" aria-hidden="true"></span></a>
+    <div>
+      <h1>Seu link continua. O destino, você decide.</h1>
+      <p>Links curtos com UTM, cliques por dia e destino editável, em um lugar só.</p>
     </div>
-    <label for="email">E-mail</label>
-    <input id="email" type="email" required autocomplete="email">
-    <label for="senha">Senha</label>
-    <input id="senha" type="password" required minlength="6" autocomplete="current-password">
-    <button class="principal largo" id="botao" type="submit">Entrar</button>
-  </form>
-  <div id="msg" class="msg"></div>
-  <p class="msg"><button class="link" id="trocar" type="button">Não tem conta? Criar cadastro</button></p>
-</main>
+    <svg class="grade auth-grade" data-grade data-cx="7" data-cy="3" role="img" aria-label="Grade de alcance: pontos ao redor do ponto do cliente"></svg>
+  </aside>
+
+  <main class="auth-form">
+    <div class="auth-caixa">
+
+      <section id="v-carregando"><p class="dica">Carregando…</p></section>
+
+      <section id="v-acesso" hidden>
+        <div class="abas" role="tablist" aria-label="Entrar ou criar conta">
+          <button class="aba" type="button" role="tab" id="aba-entrar" aria-selected="true" aria-controls="form-entrar">Entrar</button>
+          <button class="aba" type="button" role="tab" id="aba-criar" aria-selected="false" aria-controls="form-criar">Criar conta</button>
+        </div>
+
+        <form id="form-entrar" novalidate role="tabpanel" aria-labelledby="aba-entrar" class="mt-20">
+          <div class="campo"><label for="e-email">E-mail</label><input type="email" id="e-email" autocomplete="email" required></div>
+          <div class="campo"><label for="e-senha">Senha</label><input type="password" id="e-senha" autocomplete="current-password" required></div>
+          <p class="erro" id="e-erro" role="alert" hidden></p>
+          <button class="btn btn-primary btn-largo" type="submit" id="e-botao">Entrar</button>
+          <button class="linkbtn" type="button" id="e-esqueci">Esqueci minha senha</button>
+        </form>
+
+        <form id="form-criar" novalidate role="tabpanel" aria-labelledby="aba-criar" class="mt-20" hidden>
+          <div class="campo"><label for="c-empresa">Nome da sua empresa</label><input type="text" id="c-empresa" maxlength="120" autocomplete="organization" required></div>
+          <div class="campo"><label for="c-email">E-mail</label><input type="email" id="c-email" autocomplete="email" required></div>
+          <div class="campo">
+            <label for="c-senha">Senha</label>
+            <input type="password" id="c-senha" autocomplete="new-password" minlength="8" required aria-describedby="c-dica">
+            <p class="dica" id="c-dica">Pelo menos 8 caracteres.</p>
+          </div>
+          <p class="erro" id="c-erro" role="alert" hidden></p>
+          <button class="btn btn-primary btn-largo" type="submit" id="c-botao">Criar conta</button>
+          <p class="dica">Depois de confirmar o e-mail, a conta da empresa passa por uma liberação antes do primeiro acesso.</p>
+        </form>
+      </section>
+
+      <section id="v-esqueci" hidden>
+        <h2>Recuperar a senha</h2>
+        <form id="form-esqueci" novalidate class="mt-20">
+          <div class="campo"><label for="r-email">E-mail da sua conta</label><input type="email" id="r-email" autocomplete="email" required></div>
+          <p class="erro" id="r-erro" role="alert" hidden></p>
+          <button class="btn btn-primary btn-largo" type="submit" id="r-botao">Enviar link de recuperação</button>
+          <button class="linkbtn" type="button" data-voltar>Voltar para entrar</button>
+        </form>
+      </section>
+
+      <section id="v-nova" hidden>
+        <h2>Definir nova senha</h2>
+        <form id="form-nova" novalidate class="mt-20">
+          <div class="campo">
+            <label for="n-senha">Nova senha</label>
+            <input type="password" id="n-senha" autocomplete="new-password" minlength="8" required>
+            <p class="dica">Pelo menos 8 caracteres.</p>
+          </div>
+          <p class="erro" id="n-erro" role="alert" hidden></p>
+          <button class="btn btn-primary btn-largo" type="submit" id="n-botao">Salvar nova senha</button>
+        </form>
+      </section>
+
+      <section id="v-aviso" hidden>
+        <h2 id="aviso-titulo"></h2>
+        <div class="caixa-info mt-16"><p id="aviso-texto"></p></div>
+        <p class="mt-16"><button class="linkbtn" type="button" data-voltar>Voltar para entrar</button></p>
+      </section>
+
+    </div>
+  </main>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="/js/config.js"></script>
+<script src="/js/grade.js"></script>
 <script src="/js/entrar.js"></script>
 </body>
 </html>
