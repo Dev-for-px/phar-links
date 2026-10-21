@@ -4,7 +4,7 @@
   const CAMPOS = ['nome', 'slug', 'destino', ...UTMS];
   const num = (n) => Number(n || 0).toLocaleString('pt-BR');
   const diaISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  let links = [], editando = null, empresaId = null, perm = {}, papel = 'dono';
+  let links = [], editando = null, empresaId = null, perm = {}, papel = 'dono', empresa = null, porDia = [], visaoAtual = 'painel', carregado = false;
   const eq = { dados: null, editando: '', removendo: '' };
 
   // opções prontas de UTM (a pessoa também pode digitar outra)
@@ -45,13 +45,18 @@
     empresaId = perfil.empresa_id;
     const mp = await db.rpc('minhas_permissoes');
     if (mp.data) { perm = mp.data.permissoes || {}; papel = mp.data.papel; }
-    $('#btn-novo').hidden = !perm.criar;
-    $('#aba-equipe').hidden = !perm.ver_equipe && papel !== 'dono';
-    const { data: emp } = await db.from('empresas').select('nome, situacao').eq('id', empresaId).single();
+    $('#aba-painel').hidden = !perm.ver_painel;
+    $('#aba-equipe').hidden = !perm.ver_equipe;
+    $('#aba-empresa').hidden = !perm.ver_empresa;
+    const { data: emp } = await db.from('empresas').select('*').eq('id', empresaId).single();
+    empresa = emp;
     if (emp.situacao === 'pendente') return estado('Cadastro em análise', `A empresa ${emp.nome} foi cadastrada e está aguardando liberação. Assim que for liberada, clique em "Verificar de novo".`);
     if (emp.situacao === 'bloqueada') return estado('Acesso suspenso', `O acesso de ${emp.nome} está suspenso e os links não redirecionam. Fale com o suporte da PHAR Consultoria.`);
     $('#topo-empresa').textContent = emp.nome;
     tela('tela-app');
+    $('#aviso-cadastro').hidden = !(papel === 'dono' && !cadastroCompleto(emp));
+    preencherEmpresa();
+    visao(perm.ver_painel ? 'painel' : 'links');
     await carregar();
   }
 
@@ -62,7 +67,7 @@
     try { localStorage.removeItem('pl_empresa'); } catch (e) {}
     iniciar();
   }
-  $('#form-empresa').addEventListener('submit', (ev) => {
+  $('#form-nova-empresa').addEventListener('submit', (ev) => {
     ev.preventDefault();
     if ($('#nova-empresa').value.trim().length < 2) return msg($('#erro-empresa'), 'Informe o nome da empresa.');
     criarEmpresa();
@@ -71,18 +76,23 @@
   // ---------- lista ----------
   async function carregar() {
     msg($('#aviso-erro'));
-    const [r, h] = await Promise.all([
+    const ini = new Date(); ini.setDate(ini.getDate() - 29);
+    const [r, rd] = await Promise.all([
       db.from('links').select('*').order('criado_em', { ascending: false }),
-      db.from('cliques_dia').select('total').eq('dia', diaISO(new Date()))
+      db.from('cliques_dia').select('link_id, dia, total').gte('dia', diaISO(ini))
     ]);
     if (r.error) return msg($('#aviso-erro'), erroBR(r.error));
     links = r.data;
     $('#n-ativos').textContent = num(links.filter(l => l.ativo).length);
     $('#n-pausados').textContent = num(links.filter(l => !l.ativo).length);
     $('#n-total').textContent = num(links.reduce((s, l) => s + Number(l.cliques), 0));
-    $('#n-hoje').textContent = num((h.data || []).reduce((s, d) => s + d.total, 0));
+    porDia = rd.data || [];
+    carregado = true;
+    const hoje = diaISO(new Date());
+    $('#n-hoje').textContent = num(porDia.filter(d => d.dia === hoje).reduce((s, d) => s + d.total, 0));
     opcoesUtm();
     desenhar();
+    desenharPainel();
   }
 
   // lista de cada UTM: valores já usados nos links da empresa primeiro, depois as opções prontas
@@ -124,7 +134,11 @@
       return lista.append(v);
     }
 
-    for (const l of vis) {
+    for (const l of vis) lista.append(linhaLink(l));
+  }
+
+  function linhaLink(l) {
+    {
       const linha = el('div', 'linha');
       const cNome = el('div', 'c-nome');
       const nome = el('button', 'nome', l.nome); nome.type = 'button';
@@ -143,11 +157,11 @@
         try { await navigator.clipboard.writeText(`https://${dominio}/${l.slug}`); toast('Link copiado.'); }
         catch (e) { toast('Não foi possível copiar. Selecione o link e copie manualmente.'); }
       });
-      const editar = el('button', 'btn btn-primary btn-sm', 'Editar'); editar.type = 'button';
+      const editar = el('button', 'btn btn-primary btn-sm', perm.editar ? 'Editar' : 'Ver'); editar.type = 'button';
       editar.addEventListener('click', () => abrir(l));
       cAcao.append(copiar, editar);
       linha.append(cNome, cDest, cSit, cNum, cAcao);
-      lista.append(linha);
+      return linha;
     }
   }
   $('#busca').addEventListener('input', desenhar);
@@ -251,28 +265,151 @@
   });
 
   // ---------- abas ----------
+  const VISOES = {
+    painel: ['Painel', 'Como seus links estão performando.'],
+    links: ['Links', 'Seus links curtos, as UTMs de cada um e para onde eles levam agora.'],
+    equipe: ['Equipe', 'Quem usa esta conta e o que cada pessoa pode fazer.'],
+    empresa: ['Empresa', 'Os dados da sua empresa no sistema.']
+  };
   function visao(v) {
-    ['links', 'equipe'].forEach(x => {
+    visaoAtual = v;
+    Object.keys(VISOES).forEach(x => {
       $('#aba-' + x).setAttribute('aria-selected', String(x === v));
       $('#v-' + x).hidden = x !== v;
     });
-    $('.stats').hidden = v !== 'links';
-    $('#btn-novo').hidden = v !== 'links' || !perm.criar;
+    $('#band-titulo').textContent = VISOES[v][0];
+    $('#band-sub').textContent = VISOES[v][1];
+    $('.stats').hidden = !(v === 'painel' || v === 'links');
+    $('#btn-novo').hidden = !(v === 'painel' || v === 'links') || !perm.criar;
     if (v === 'equipe') carregarEquipe();
+    if (v === 'painel') desenharPainel();
   }
   document.querySelectorAll('.aba-app').forEach(b => b.addEventListener('click', () => visao(b.dataset.visao)));
+  $('#btn-ver-links').addEventListener('click', () => visao('links'));
+  $('#btn-completar').addEventListener('click', () => visao('empresa'));
+
+  // ---------- painel (gráficos do PHAR Prospector) ----------
+  const G = window.PP.graficos;
+  const CORES = ['proposta', 'andamento', 'novo', 'fechado', 'depois', 'perdido'];
+  function desenharPainel() {
+    if (visaoAtual !== 'painel' || !carregado) return;
+    const vazio = $('#painel-vazio'), conteudo = $('#painel-conteudo');
+    if (!links.length) {
+      vazio.replaceChildren(h('div', { class: 'vazio' }, h('h2', { text: 'Seu painel aparece aqui' }),
+        h('p', { text: 'Crie o primeiro link e, assim que ele receber cliques, os gráficos começam a se formar.' }),
+        perm.criar ? h('button', { class: 'btn btn-primary', type: 'button', text: 'Criar o primeiro link', onclick: () => abrir(null) }) : null));
+      vazio.hidden = false; conteudo.hidden = true; return;
+    }
+    vazio.hidden = true; conteudo.hidden = false;
+
+    // cliques por dia, últimos 30 dias
+    const soma = {};
+    porDia.forEach(d => { soma[d.dia] = (soma[d.dia] || 0) + d.total; });
+    const pontos = [], ini = new Date(); ini.setDate(ini.getDate() - 29);
+    for (let i = 0; i < 30; i++) { const d = new Date(ini); d.setDate(ini.getDate() + i); const k = diaISO(d); pontos.push({ x: k, y: soma[k] || 0 }); }
+    G.linha($('#graf-dias'), pontos, { titulo: 'Cliques por dia', unidade: 'cliques', coluna: 'Cliques', vazio: 'Nenhum clique nos últimos 30 dias.' });
+
+    // cliques por origem (utm_source), 5 maiores + outras
+    const porOrigem = {};
+    links.forEach(l => { const k = l.utm_source || 'Sem origem'; porOrigem[k] = (porOrigem[k] || 0) + Number(l.cliques); });
+    const ordem = Object.entries(porOrigem).sort((a, b) => b[1] - a[1]);
+    const fatias = ordem.slice(0, 5).map(([rotulo, valor], i) => ({ chave: CORES[i], rotulo, valor }));
+    const resto = ordem.slice(5).reduce((s, x) => s + x[1], 0);
+    if (resto) fatias.push({ chave: CORES[5], rotulo: 'Outras', valor: resto });
+    G.rosca($('#graf-origem'), fatias, { titulo: 'Cliques por origem', unidade: 'cliques', vazio: 'Ainda não há cliques.' });
+
+    // 5 links mais clicados
+    const top = links.slice().sort((a, b) => b.cliques - a.cliques).slice(0, 5);
+    $('#lista-top').replaceChildren(...top.map(linhaLink));
+  }
+
+  // ---------- empresa (mesmo cadastro do PHAR Prospector) ----------
+  const CAMPOS_EMP = ['nome', 'razao_social', 'documento', 'segmento', 'telefone', 'email', 'site', 'instagram', 'descricao', 'cep', 'logradouro', 'numero', 'complemento', 'bairro', 'cidade', 'uf'];
+  const ERROS_EMP = {
+    nome_invalido: 'Informe o nome da empresa.',
+    documento_invalido: 'Confira o CNPJ ou CPF: o número não é válido.',
+    cep_invalido: 'O CEP precisa ter 8 números.',
+    uf_invalida: 'Escolha o estado na lista.',
+    email_invalido: 'Confira o e-mail comercial.',
+    sem_permissao: 'Só o responsável pela conta pode alterar os dados da empresa.'
+  };
+  const cadastroCompleto = (c) => !!(c && c.nome && c.documento && c.telefone && c.cidade && c.uf);
+  const limpo = (v) => String(v || '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+  function docFormatado(v) {
+    const d = limpo(v);
+    if (d.length === 11) return d.slice(0, 3) + '.' + d.slice(3, 6) + '.' + d.slice(6, 9) + '-' + d.slice(9);
+    if (d.length === 14) return d.slice(0, 2) + '.' + d.slice(2, 5) + '.' + d.slice(5, 8) + '/' + d.slice(8, 12) + '-' + d.slice(12);
+    return String(v || '');
+  }
+  function cepFormatado(v) { const d = String(v || '').replace(/\D/g, ''); return d.length === 8 ? d.slice(0, 5) + '-' + d.slice(5) : String(v || ''); }
+  function digito(v, pesos) { const s = v.reduce((a, x, i) => a + x * pesos[i], 0) % 11; return s < 2 ? 0 : 11 - s; }
+  function docValido(v) {
+    const d = limpo(v);
+    if (d.length === 11) {
+      if (/^(\d)\1{10}$/.test(d)) return false;
+      const n = d.split('').map(Number);
+      const d1 = (n.slice(0, 9).reduce((a, x, i) => a + x * (10 - i), 0) * 10) % 11 % 10;
+      const d2 = (n.slice(0, 10).reduce((a, x, i) => a + x * (11 - i), 0) * 10) % 11 % 10;
+      return d1 === n[9] && d2 === n[10];
+    }
+    if (d.length === 14 && /^[A-Z0-9]{12}\d{2}$/.test(d) && !/^(.)\1{13}$/.test(d)) {
+      const v2 = d.split('').map(c => c.charCodeAt(0) - 48), p1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+      return digito(v2.slice(0, 12), p1) === v2[12] && digito(v2.slice(0, 13), [6, ...p1]) === v2[13];
+    }
+    return false;
+  }
+
+  function preencherEmpresa() {
+    const c = empresa || {}, pode = papel === 'dono';
+    CAMPOS_EMP.forEach(k => {
+      const campo = $('#emp-' + k); if (!campo) return;
+      let v = c[k] || '';
+      if (k === 'documento') v = docFormatado(v);
+      if (k === 'cep') v = cepFormatado(v);
+      campo.value = v; campo.disabled = !pode;
+    });
+    $('#emp-acoes').hidden = !pode;
+    $('#emp-dica').textContent = pode
+      ? 'Preencha os dados completos da empresa. Toda a equipe pode ver; só o responsável pela conta altera.'
+      : 'Estes são os dados da sua empresa no sistema. Só o responsável pela conta altera.';
+    $('#emp-atualizado').textContent = c.dados_em ? 'Atualizado em ' + new Date(c.dados_em).toLocaleDateString('pt-BR') : '';
+  }
+
+  $('#emp-documento').addEventListener('blur', () => { const v = $('#emp-documento').value; if (docValido(v)) $('#emp-documento').value = docFormatado(v); });
+  $('#emp-cep').addEventListener('blur', () => { $('#emp-cep').value = cepFormatado($('#emp-cep').value); });
+
+  $('#form-empresa').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const err = $('#emp-erro'), dados = {};
+    CAMPOS_EMP.forEach(k => { dados[k] = $('#emp-' + k).value.trim(); });
+    $('#emp-documento').removeAttribute('aria-invalid');
+    if (dados.nome.length < 2) return msg(err, ERROS_EMP.nome_invalido);
+    if (dados.documento && !docValido(dados.documento)) { $('#emp-documento').setAttribute('aria-invalid', 'true'); return msg(err, ERROS_EMP.documento_invalido); }
+    msg(err); $('#emp-salvar').disabled = true;
+    const r = await db.rpc('empresa_salvar', { p: dados });
+    $('#emp-salvar').disabled = false;
+    if (r.error) return msg(err, ERROS_EMP[r.error.message] || erroBR(r.error));
+    const nova = await db.from('empresas').select('*').eq('id', empresaId).single();
+    if (nova.data) empresa = nova.data;
+    $('#topo-empresa').textContent = empresa.nome;
+    $('#aviso-cadastro').hidden = cadastroCompleto(empresa);
+    preencherEmpresa();
+    toast('Dados da empresa salvos.');
+  });
 
   // ---------- equipe (mesmo modelo do PHAR Prospector) ----------
   const PERMS = [
     { grupo: 'O que pode ver', itens: [
+      ['ver_painel', 'Painel com os gráficos'],
       ['ver_todos', 'Links de toda a equipe', 'Desmarcado: vê só os links que ela mesma criou.'],
-      ['ver_equipe', 'Quem faz parte da equipe']] },
+      ['ver_equipe', 'Quem faz parte da equipe'],
+      ['ver_empresa', 'Dados da empresa (CNPJ, endereço)']] },
     { grupo: 'O que pode fazer', itens: [
       ['criar', 'Criar links'],
       ['editar', 'Editar links (destino, UTMs, pausar)'],
       ['excluir', 'Excluir links']] }
   ];
-  const PERM_PADRAO = { ver_todos: true, ver_equipe: true, criar: true, editar: true, excluir: false };
+  const PERM_PADRAO = { ver_painel: true, ver_todos: true, ver_equipe: true, ver_empresa: true, criar: true, editar: true, excluir: false };
   const ERROS_EQUIPE = {
     email_invalido: 'Confira o e-mail digitado.',
     ja_membro: 'Esta pessoa já faz parte da equipe.',
@@ -309,7 +446,9 @@
     if (!v) return '';
     const lista = (a) => a.length > 1 ? a.slice(0, -1).join(', ') + ' e ' + a[a.length - 1] : a[0];
     const ve = [v.ver_todos ? 'os links de toda a equipe' : 'só os links que criou'];
+    if (v.ver_painel) ve.push('o painel');
     if (v.ver_equipe) ve.push('a equipe');
+    if (v.ver_empresa) ve.push('os dados da empresa');
     const faz = [];
     if (v.criar) faz.push('criar'); if (v.editar) faz.push('editar'); if (v.excluir) faz.push('excluir');
     return 'Vê ' + lista(ve) + '. ' + (faz.length ? 'Pode ' + lista(faz) + '.' : 'Não altera nada.');

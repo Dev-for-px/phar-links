@@ -296,3 +296,69 @@ revoke execute on function public.minhas_permissoes(), public.equipe_listar(), p
   public.equipe_permissoes(jsonb, uuid, uuid), public.equipe_cancelar_convite(uuid), public.equipe_remover(uuid) from public, anon;
 grant execute on function public.minhas_permissoes(), public.equipe_listar(), public.equipe_autorizar(text, jsonb),
   public.equipe_permissoes(jsonb, uuid, uuid), public.equipe_cancelar_convite(uuid), public.equipe_remover(uuid) to authenticated;
+
+-- =====================================================================
+-- Cadastro da empresa e permissões ver_painel / ver_empresa
+-- =====================================================================
+alter table public.empresas
+  add column razao_social text not null default '' check (char_length(razao_social) <= 160),
+  add column documento text not null default '' check (documento ~ '^(\d{11}|[A-Z0-9]{12}\d{2})?$'),
+  add column segmento text not null default '' check (char_length(segmento) <= 80),
+  add column telefone text not null default '' check (char_length(telefone) <= 30),
+  add column email text not null default '' check (char_length(email) <= 120),
+  add column site text not null default '' check (char_length(site) <= 200),
+  add column instagram text not null default '' check (char_length(instagram) <= 80),
+  add column cep text not null default '' check (cep ~ '^(\d{8})?$'),
+  add column logradouro text not null default '' check (char_length(logradouro) <= 160),
+  add column numero text not null default '' check (char_length(numero) <= 20),
+  add column complemento text not null default '' check (char_length(complemento) <= 80),
+  add column bairro text not null default '' check (char_length(bairro) <= 80),
+  add column cidade text not null default '' check (char_length(cidade) <= 80),
+  add column uf text not null default '' check (uf ~ '^([A-Z]{2})?$'),
+  add column descricao text not null default '' check (char_length(descricao) <= 500),
+  add column dados_em timestamptz;
+
+-- ver_painel e ver_empresa: só escondem a aba
+create or replace function private.permissoes_padrao() returns jsonb
+language sql immutable set search_path = '' as
+$$ select '{"ver_painel":true,"ver_todos":true,"ver_equipe":true,"ver_empresa":true,"criar":true,"editar":true,"excluir":false}'::jsonb $$;
+
+create function public.empresa_salvar(p jsonb) returns void
+language plpgsql security definer set search_path = '' as
+$$ declare
+  v_emp uuid := private.minha_empresa_ativa();
+  v_nome text := btrim(coalesce(p->>'nome', ''));
+  v_doc text := upper(regexp_replace(coalesce(p->>'documento', ''), '[^0-9A-Za-z]', '', 'g'));
+  v_cep text := regexp_replace(coalesce(p->>'cep', ''), '\D', '', 'g');
+  v_uf text := upper(btrim(coalesce(p->>'uf', '')));
+  v_email text := lower(btrim(coalesce(p->>'email', '')));
+begin
+  if v_emp is null or not private.sou_dono() then raise exception 'sem_permissao' using errcode = '42501'; end if;
+  if char_length(v_nome) < 2 or char_length(v_nome) > 120 then raise exception 'nome_invalido' using errcode = 'P0001'; end if;
+  if v_doc <> '' and v_doc !~ '^(\d{11}|[A-Z0-9]{12}\d{2})$' then raise exception 'documento_invalido' using errcode = 'P0001'; end if;
+  if v_cep <> '' and v_cep !~ '^\d{8}$' then raise exception 'cep_invalido' using errcode = 'P0001'; end if;
+  if v_uf <> '' and v_uf !~ '^[A-Z]{2}$' then raise exception 'uf_invalida' using errcode = 'P0001'; end if;
+  if v_email <> '' and (v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' or char_length(v_email) > 120) then
+    raise exception 'email_invalido' using errcode = 'P0001'; end if;
+  update public.empresas set
+    nome = v_nome,
+    razao_social = left(btrim(coalesce(p->>'razao_social', '')), 160),
+    documento = v_doc,
+    segmento = left(btrim(coalesce(p->>'segmento', '')), 80),
+    telefone = left(btrim(coalesce(p->>'telefone', '')), 30),
+    email = v_email,
+    site = left(btrim(coalesce(p->>'site', '')), 200),
+    instagram = left(btrim(coalesce(p->>'instagram', '')), 80),
+    cep = v_cep,
+    logradouro = left(btrim(coalesce(p->>'logradouro', '')), 160),
+    numero = left(btrim(coalesce(p->>'numero', '')), 20),
+    complemento = left(btrim(coalesce(p->>'complemento', '')), 80),
+    bairro = left(btrim(coalesce(p->>'bairro', '')), 80),
+    cidade = left(btrim(coalesce(p->>'cidade', '')), 80),
+    uf = v_uf,
+    descricao = left(btrim(coalesce(p->>'descricao', '')), 500),
+    dados_em = now()
+  where id = v_emp;
+end $$;
+revoke execute on function public.empresa_salvar(jsonb) from public, anon;
+grant execute on function public.empresa_salvar(jsonb) to authenticated;

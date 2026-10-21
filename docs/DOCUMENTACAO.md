@@ -19,9 +19,16 @@ Encurtador de links com UTM e destino editável, para várias empresas clientes.
 4. Cada link tem: nome interno, endereço curto (slug), destino e as 5 UTMs. A tela mostra a URL final antes de salvar.
 5. Clique em `/<slug>`: a função `api/go.js` chama `resolver_link` no banco, que soma o clique e devolve destino + UTMs. A função monta a URL (mantendo parâmetros que o destino já tinha) e redireciona com 302, sem cache, para a troca de destino valer na hora.
 
+## Abas do sistema
+Mesmo padrão do PHAR Prospector: **Painel**, **Links**, **Equipe** e **Empresa**, na faixa azul do topo.
+- **Painel:** gráfico de linha com os cliques por dia dos últimos 30 dias (soma de todos os links), rosca com cliques por origem (utm_source, 5 maiores + "Outras") e lista dos 5 links mais clicados. Os gráficos são o mesmo `js/graficos.js` do Prospector (SVG, sem biblioteca externa). Aviso "Complete o cadastro da empresa" para o responsável enquanto faltar CNPJ/CPF, telefone, cidade ou estado.
+- **Links:** busca, filtro por situação, lista e janela de edição.
+- **Equipe:** abaixo.
+- **Empresa:** cadastro completo (nome, razão social, CNPJ ou CPF com validação, ramo, telefone, e-mail, site, Instagram, descrição e endereço). A equipe vê; só o responsável altera (`empresa_salvar`). O admin vê "Cadastro incompleto" no painel admin.
+
 ## Equipe e permissões
 - Mesmo modelo do PHAR Prospector. Na aba Equipe, o responsável autoriza o e-mail de um colaborador e marca as permissões. A pessoa cria a conta em `/entrar` com esse e-mail (sem precisar informar empresa) e entra direto na equipe. O sistema não envia convite por e-mail; há o botão "Copiar o link de cadastro".
-- Permissões (caixinhas): ver links de toda a equipe (desmarcado = só os que criou), ver a equipe, criar, editar, excluir. Começam marcadas todas menos excluir. Valem no banco (`private.pode`), não só na tela. O responsável pode tudo.
+- Permissões (caixinhas): ver painel, ver links de toda a equipe (desmarcado = só os que criou), ver a equipe, ver dados da empresa, criar, editar, excluir. Começam marcadas todas menos excluir. Ver links, criar, editar e excluir valem no banco (`private.pode`); ver painel e ver empresa só escondem a aba. O responsável pode tudo.
 - O responsável muda permissões, cancela autorizações e remove pessoas (os links criados por ela continuam na empresa). Limite de 20 pessoas por empresa.
 - Convites ficam em `private.convites` com situação pendente/aceito/cancelado (não são apagados).
 
@@ -34,11 +41,11 @@ Encurtador de links com UTM e destino editável, para várias empresas clientes.
 - Telas: página inicial (`index.html`), entrar com abas Entrar/Criar conta e recuperação de senha, sistema com faixa azul (resumo: ativos, pausados, cliques hoje, total), lista de links, janela de edição com gráfico de 30 dias, e painel admin com Liberar/Suspender/Reativar.
 
 ## Banco
-- `empresas` (nome, situação: pendente/ativa/bloqueada)
+- `empresas` (nome, situação: pendente/ativa/bloqueada, e o cadastro: razão social, documento, contatos, endereço, `dados_em`)
 - `perfis` (um por usuário: e-mail, empresa, papel dono/membro, admin, permissões)
 - `links` (criado_por, slug único no sistema todo, destino, UTMs, ativo, total de cliques)
 - `cliques_dia` (um registro por link por dia, com o total)
-- Funções: `minhas_permissoes`, `equipe_listar`, `equipe_autorizar`, `equipe_permissoes`, `equipe_cancelar_convite`, `equipe_remover`, `empresa_criar` (cadastro da empresa), `resolver_link` (redirecionamento), `private.eu_admin`, `private.minha_empresa_ativa`.
+- Funções: `empresa_salvar`, `minhas_permissoes`, `equipe_listar`, `equipe_autorizar`, `equipe_permissoes`, `equipe_cancelar_convite`, `equipe_remover`, `empresa_criar` (cadastro da empresa), `resolver_link` (redirecionamento), `private.eu_admin`, `private.minha_empresa_ativa`.
 - Arquivo para recriar tudo: `supabase/schema-completo.sql`.
 
 ## Segurança
@@ -67,6 +74,7 @@ Encurtador de links com UTM e destino editável, para várias empresas clientes.
 - Cobrança e assinatura; QR Code por link (ideias futuras).
 
 ## Histórico
+- 21/10/2026 — abas Painel (gráficos do Prospector) e Empresa (cadastro completo); permissões ver painel e ver empresa.
 - 21/10/2026 — Equipe com permissões (como no Prospector), opções prontas de UTM e botão para copiar a URL final.
 - 21/10/2026 — telas no padrão do PHAR Prospector, página inicial e recuperação de senha.
 - 21/10/2026 — primeira versão: cadastro com aprovação, links com UTM e destino editável, contador total e por dia, administração de empresas.

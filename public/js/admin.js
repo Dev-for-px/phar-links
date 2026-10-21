@@ -57,7 +57,9 @@
       const dono = perfis.data.find(p => p.empresa_id === e.id && p.papel === 'dono');
       const linha = el('div', 'adm-linha lk');
       const cNome = el('div', 'a-nome');
-      cNome.append(el('div', 'nome', e.nome), el('div', 'sub', 'Desde ' + new Date(e.criado_em).toLocaleDateString('pt-BR')));
+      const completo = !!(e.documento && e.telefone && e.cidade && e.uf);
+      cNome.append(el('div', 'nome', e.nome), el('div', 'sub', 'Desde ' + new Date(e.criado_em).toLocaleDateString('pt-BR') + (e.cidade ? ' · ' + e.cidade + (e.uf ? '/' + e.uf : '') : '')));
+      if (!completo) cNome.append(el('div', 'sub adm-falta', 'Cadastro incompleto'));
       const cSit = el('div');
       cSit.append(el('span', 'tag c-' + e.situacao, NOMES[e.situacao]));
       const nLinks = el('div', 'num-col rot', num(ls.length)); nLinks.dataset.rot = 'Links';

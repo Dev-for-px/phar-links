@@ -55,5 +55,8 @@ window.PL = (function () {
 
   async function sair() { try { await db.auth.signOut(); } catch (e) {} location.href = '/'; }
 
+  // graficos.js (copiado do Prospector) usa window.PP.el
+  window.PP = { el: h };
+
   return { dominio: 'links.pharconsultoria.com', db, hashInicial, $, el, h, msg, toast, erroBR, sair };
 })();
