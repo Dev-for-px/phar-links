@@ -1,5 +1,5 @@
 -- PHAR Links — banco completo (rodar no SQL Editor de um projeto Supabase novo para recriar tudo).
--- Atualizado em 21/10/2026.
+-- Atualizado em 21/10/2026 (com equipe e permissões).
 
 create schema if not exists private;
 
@@ -139,3 +139,160 @@ $$ declare l public.links; begin
 end $$;
 revoke execute on function public.resolver_link(text) from public, authenticated;
 grant execute on function public.resolver_link(text) to anon;
+
+-- =====================================================================
+-- Equipe e permissões (mesmo modelo do PHAR Prospector)
+-- =====================================================================
+alter table public.perfis add column permissoes jsonb not null default '{}'::jsonb;
+alter table public.links add column criado_por uuid references auth.users(id) on delete set null default auth.uid();
+
+create table private.convites (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references public.empresas(id) on delete cascade,
+  email text not null check (email = lower(btrim(email)) and char_length(email) between 3 and 120),
+  permissoes jsonb not null default '{}'::jsonb,
+  estado text not null default 'pendente' check (estado in ('pendente','aceito','cancelado')),
+  criado_em timestamptz not null default now()
+);
+create unique index convites_um_pendente on private.convites(email) where estado = 'pendente';
+
+--   ver_todos  ver os links de toda a equipe (desmarcado: só os que a pessoa criou)
+--   criar / editar / excluir links · ver_equipe ver quem faz parte da equipe
+create function private.permissoes_padrao() returns jsonb
+language sql immutable set search_path = '' as
+$$ select '{"ver_todos":true,"criar":true,"editar":true,"excluir":false,"ver_equipe":true}'::jsonb $$;
+
+create function private.permissoes_limpas(p jsonb) returns jsonb
+language sql immutable set search_path = '' as
+$$ select jsonb_object_agg(d.key,
+     case when jsonb_typeof(coalesce(p,'{}'::jsonb) -> d.key) = 'boolean' then coalesce(p,'{}'::jsonb) -> d.key else d.value end)
+   from jsonb_each(private.permissoes_padrao()) d $$;
+
+create function private.sou_dono() returns boolean
+language sql stable security definer set search_path = '' as
+$$ select coalesce((select papel = 'dono' from public.perfis where user_id = auth.uid()), false) $$;
+
+create function private.pode(p_chave text) returns boolean
+language sql stable security definer set search_path = '' as
+$$ select coalesce((select case when p.papel = 'dono' then true
+     else (private.permissoes_limpas(p.permissoes) ->> p_chave)::boolean end
+   from public.perfis p where p.user_id = auth.uid()), false) $$;
+
+grant execute on function private.pode(text), private.sou_dono() to authenticated;
+
+-- cadastro com e-mail autorizado entra na equipe como colaborador
+create or replace function private.novo_usuario() returns trigger
+language plpgsql security definer set search_path = '' as
+$$ declare c private.convites; begin
+  select * into c from private.convites where email = lower(new.email) and estado = 'pendente';
+  if found then
+    insert into public.perfis(user_id, email, empresa_id, papel, permissoes)
+    values (new.id, new.email, c.empresa_id, 'membro', private.permissoes_limpas(c.permissoes));
+    update private.convites set estado = 'aceito' where id = c.id;
+  else
+    insert into public.perfis(user_id, email, admin)
+    values (new.id, new.email, lower(new.email) = 'pedrodadila@gmail.com');
+  end if;
+  return new; end $$;
+
+create or replace function private.antes_salvar_link() returns trigger
+language plpgsql set search_path = '' as
+$$ begin
+  new.slug := lower(trim(new.slug));
+  if current_user in ('authenticated','anon') then
+    new.atualizado_em := now();
+    if tg_op = 'INSERT' then new.cliques := 0; new.criado_por := auth.uid();
+    else new.cliques := old.cliques; new.empresa_id := old.empresa_id; new.criado_por := old.criado_por; end if;
+  end if;
+  return new; end $$;
+
+alter policy links_ler on public.links using (
+  private.eu_admin() or (empresa_id = private.minha_empresa_ativa()
+    and (private.pode('ver_todos') or criado_por = auth.uid())));
+alter policy links_criar on public.links with check (
+  empresa_id = private.minha_empresa_ativa() and private.pode('criar'));
+alter policy links_editar on public.links using (
+  empresa_id = private.minha_empresa_ativa() and private.pode('editar')
+  and (private.pode('ver_todos') or criado_por = auth.uid()))
+  with check (empresa_id = private.minha_empresa_ativa());
+alter policy links_excluir on public.links using (
+  empresa_id = private.minha_empresa_ativa() and private.pode('excluir')
+  and (private.pode('ver_todos') or criado_por = auth.uid()));
+
+create function public.minhas_permissoes() returns jsonb
+language sql stable security definer set search_path = '' as
+$$ select jsonb_build_object('papel', p.papel, 'permissoes',
+     case when p.papel = 'dono' then (select jsonb_object_agg(k, true) from jsonb_object_keys(private.permissoes_padrao()) k)
+     else private.permissoes_limpas(p.permissoes) end)
+   from public.perfis p where p.user_id = auth.uid() $$;
+
+create function public.equipe_listar() returns jsonb
+language plpgsql stable security definer set search_path = '' as
+$$ declare v_emp uuid := private.minha_empresa_ativa(); v_dono boolean := private.sou_dono(); begin
+  if v_emp is null then raise exception 'sem_permissao' using errcode = '42501'; end if;
+  return jsonb_build_object(
+    'membros', (select coalesce(jsonb_agg(jsonb_build_object(
+        'id', p.user_id, 'email', p.email, 'papel', p.papel, 'ultimo_acesso', u.last_sign_in_at,
+        'permissoes', case when v_dono and p.papel <> 'dono' then private.permissoes_limpas(p.permissoes) end)
+        order by (p.papel = 'dono') desc, p.email), '[]'::jsonb)
+      from public.perfis p join auth.users u on u.id = p.user_id
+      where p.empresa_id = v_emp and (private.pode('ver_equipe') or p.user_id = auth.uid())),
+    'convites', case when v_dono then (select coalesce(jsonb_agg(jsonb_build_object(
+        'id', c.id, 'email', c.email, 'criado_em', c.criado_em, 'permissoes', private.permissoes_limpas(c.permissoes))
+        order by c.criado_em), '[]'::jsonb) from private.convites c where c.empresa_id = v_emp and c.estado = 'pendente') else '[]'::jsonb end,
+    'pode_gerenciar', v_dono,
+    'padrao', private.permissoes_padrao());
+end $$;
+
+create function public.equipe_autorizar(p_email text, p_permissoes jsonb) returns void
+language plpgsql security definer set search_path = '' as
+$$ declare v_emp uuid := private.minha_empresa_ativa(); v_email text := lower(btrim(p_email)); begin
+  if v_emp is null or not private.sou_dono() then raise exception 'sem_permissao' using errcode = '42501'; end if;
+  if v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'email_invalido' using errcode = 'P0001'; end if;
+  if exists (select 1 from public.perfis where lower(email) = v_email and empresa_id = v_emp) then
+    raise exception 'ja_membro' using errcode = 'P0001'; end if;
+  if exists (select 1 from public.perfis where lower(email) = v_email) then
+    raise exception 'ja_cadastrado' using errcode = 'P0001'; end if;
+  if exists (select 1 from private.convites where email = v_email and estado = 'pendente') then
+    raise exception 'ja_autorizado' using errcode = 'P0001'; end if;
+  if (select count(*) from public.perfis where empresa_id = v_emp)
+     + (select count(*) from private.convites where empresa_id = v_emp and estado = 'pendente') >= 20 then
+    raise exception 'limite_equipe' using errcode = 'P0001'; end if;
+  insert into private.convites(empresa_id, email, permissoes) values (v_emp, v_email, private.permissoes_limpas(p_permissoes));
+end $$;
+
+create function public.equipe_permissoes(p_permissoes jsonb, p_usuario uuid default null, p_convite uuid default null) returns void
+language plpgsql security definer set search_path = '' as
+$$ declare v_emp uuid := private.minha_empresa_ativa(); begin
+  if v_emp is null or not private.sou_dono() then raise exception 'sem_permissao' using errcode = '42501'; end if;
+  if p_usuario is not null then
+    update public.perfis set permissoes = private.permissoes_limpas(p_permissoes)
+     where user_id = p_usuario and empresa_id = v_emp and papel <> 'dono';
+  else
+    update private.convites set permissoes = private.permissoes_limpas(p_permissoes)
+     where id = p_convite and empresa_id = v_emp and estado = 'pendente';
+  end if;
+  if not found then raise exception 'nao_encontrado' using errcode = 'P0001'; end if;
+end $$;
+
+create function public.equipe_cancelar_convite(p_id uuid) returns void
+language plpgsql security definer set search_path = '' as
+$$ begin
+  if private.minha_empresa_ativa() is null or not private.sou_dono() then raise exception 'sem_permissao' using errcode = '42501'; end if;
+  update private.convites set estado = 'cancelado' where id = p_id and empresa_id = private.minha_empresa_ativa() and estado = 'pendente';
+end $$;
+
+-- tira a pessoa da equipe; os links que ela criou continuam na empresa
+create function public.equipe_remover(p_usuario uuid) returns void
+language plpgsql security definer set search_path = '' as
+$$ begin
+  if private.minha_empresa_ativa() is null or not private.sou_dono() then raise exception 'sem_permissao' using errcode = '42501'; end if;
+  update public.perfis set empresa_id = null, papel = 'dono', permissoes = '{}'::jsonb
+   where user_id = p_usuario and empresa_id = private.minha_empresa_ativa() and papel <> 'dono';
+  if not found then raise exception 'nao_encontrado' using errcode = 'P0001'; end if;
+end $$;
+
+revoke execute on function public.minhas_permissoes(), public.equipe_listar(), public.equipe_autorizar(text, jsonb),
+  public.equipe_permissoes(jsonb, uuid, uuid), public.equipe_cancelar_convite(uuid), public.equipe_remover(uuid) from public, anon;
+grant execute on function public.minhas_permissoes(), public.equipe_listar(), public.equipe_autorizar(text, jsonb),
+  public.equipe_permissoes(jsonb, uuid, uuid), public.equipe_cancelar_convite(uuid), public.equipe_remover(uuid) to authenticated;

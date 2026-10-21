@@ -15,6 +15,20 @@ window.PL = (function () {
     return e;
   }
 
+  // h('div', {class:'x', text:'y', onclick: fn}, filho1, [filho2, filho3])
+  function h(tag, props, ...filhos) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (v == null || v === false) continue;
+      if (k === 'class') n.className = v;
+      else if (k === 'text') n.textContent = v;
+      else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v === true ? '' : v);
+    }
+    filhos.flat().forEach(f => { if (f != null && f !== false) n.append(f); });
+    return n;
+  }
+
   // mostra (ou esconde, sem texto) uma mensagem de erro/aviso
   function msg(alvo, texto) { alvo.textContent = texto || ''; alvo.hidden = !texto; }
 
@@ -41,5 +55,5 @@ window.PL = (function () {
 
   async function sair() { try { await db.auth.signOut(); } catch (e) {} location.href = '/'; }
 
-  return { dominio: 'links.pharconsultoria.com', db, hashInicial, $, el, msg, toast, erroBR, sair };
+  return { dominio: 'links.pharconsultoria.com', db, hashInicial, $, el, h, msg, toast, erroBR, sair };
 })();

@@ -56,6 +56,10 @@
         </div>
         <button class="btn btn-accent" type="button" id="btn-novo">Novo link</button>
       </div>
+      <div class="abas-app" role="tablist" aria-label="Áreas do sistema">
+        <button class="aba-app" type="button" role="tab" id="aba-links" data-visao="links" aria-selected="true" aria-controls="v-links">Links</button>
+        <button class="aba-app" type="button" role="tab" id="aba-equipe" data-visao="equipe" aria-selected="false" aria-controls="v-equipe">Equipe</button>
+      </div>
       <div class="stats" role="group" aria-label="Resumo">
         <div class="stat"><b id="n-ativos">–</b><span>Links ativos</span></div>
         <div class="stat"><b id="n-pausados">–</b><span>Pausados</span></div>
@@ -67,6 +71,7 @@
 
   <main class="wrap sistema">
     <div class="aviso aviso-erro" id="aviso-erro" role="alert" hidden></div>
+    <section id="v-links" role="tabpanel" aria-labelledby="aba-links">
     <div class="toolbar">
       <div class="campo busca"><label for="busca">Buscar</label><input type="search" id="busca" placeholder="Nome, endereço curto ou destino"></div>
       <div class="campo"><label for="filtro">Situação</label>
@@ -76,6 +81,29 @@
     <div class="resumo" id="resumo"></div>
     <div class="lista-head" aria-hidden="true"><div>Link</div><div>Destino</div><div>Situação</div><div>Cliques</div><div></div></div>
     <div class="lista" id="lista"></div>
+    </section>
+
+    <section id="v-equipe" role="tabpanel" aria-labelledby="aba-equipe" hidden>
+      <div class="equipe">
+        <section>
+          <h2>Quem usa esta conta</h2>
+          <p class="dica" id="eq-dica">O responsável pela conta define o que cada pessoa pode ver e fazer.</p>
+          <div id="eq-membros"></div>
+        </section>
+        <section id="eq-gerenciar" hidden>
+          <h2>Adicionar colaborador</h2>
+          <p class="dica">Informe o e-mail da pessoa. Depois peça para ela criar a conta na página de entrada usando esse mesmo e-mail: ela entra direto na sua equipe. O sistema não envia o convite por e-mail.</p>
+          <form class="eq-novo" id="form-convite" novalidate>
+            <div class="campo"><label for="eq-email">E-mail do colaborador</label><input type="email" id="eq-email" maxlength="120" autocomplete="off"></div>
+            <div id="eq-perms-novo"></div>
+            <p class="erro" id="eq-erro" role="alert" hidden></p>
+            <div class="acoes"><button class="btn btn-primary" type="submit" id="eq-convidar">Adicionar colaborador</button></div>
+          </form>
+          <div id="eq-convites"></div>
+          <p><button class="linkbtn" type="button" id="eq-copiar">Copiar o link de cadastro</button></p>
+        </section>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -95,13 +123,18 @@
       <div class="secao">
         <h3>UTMs (opcional)</h3>
         <div class="grid">
-          <div class="campo"><label for="f-utm_source">Origem · utm_source</label><input type="text" id="f-utm_source" maxlength="100" placeholder="instagram"></div>
-          <div class="campo"><label for="f-utm_medium">Mídia · utm_medium</label><input type="text" id="f-utm_medium" maxlength="100" placeholder="social"></div>
-          <div class="campo"><label for="f-utm_campaign">Campanha · utm_campaign</label><input type="text" id="f-utm_campaign" maxlength="100" placeholder="black-friday"></div>
-          <div class="campo"><label for="f-utm_content">Conteúdo · utm_content</label><input type="text" id="f-utm_content" maxlength="100" placeholder="bio"></div>
-          <div class="campo"><label for="f-utm_term">Termo · utm_term</label><input type="text" id="f-utm_term" maxlength="100"></div>
+          <div class="campo"><label for="f-utm_source">Origem · utm_source</label><input type="text" id="f-utm_source" maxlength="100" list="op-utm_source" autocomplete="off" placeholder="instagram"></div>
+          <div class="campo"><label for="f-utm_medium">Mídia · utm_medium</label><input type="text" id="f-utm_medium" maxlength="100" list="op-utm_medium" autocomplete="off" placeholder="social"></div>
+          <div class="campo"><label for="f-utm_campaign">Campanha · utm_campaign</label><input type="text" id="f-utm_campaign" maxlength="100" list="op-utm_campaign" autocomplete="off" placeholder="black-friday"></div>
+          <div class="campo"><label for="f-utm_content">Conteúdo · utm_content</label><input type="text" id="f-utm_content" maxlength="100" list="op-utm_content" autocomplete="off" placeholder="bio"></div>
+          <div class="campo"><label for="f-utm_term">Termo · utm_term</label><input type="text" id="f-utm_term" maxlength="100" list="op-utm_term" autocomplete="off"></div>
         </div>
-        <p class="lk-previa"><b>Vai abrir:</b> <span id="f-previa">—</span></p>
+        <p class="dica">Escolha uma opção pronta da lista ou digite outra.</p>
+        <datalist id="op-utm_source"></datalist><datalist id="op-utm_medium"></datalist><datalist id="op-utm_campaign"></datalist><datalist id="op-utm_content"></datalist><datalist id="op-utm_term"></datalist>
+        <div class="lk-previa-caixa">
+          <p class="lk-previa"><b>Vai abrir:</b> <span id="f-previa">—</span></p>
+          <button class="btn btn-sec btn-sm" type="button" id="btn-copiar-final">Copiar</button>
+        </div>
         <label class="caixa"><input type="checkbox" id="f-ativo" checked><span>Link ativo<small>Desmarque para pausar sem apagar.</small></span></label>
       </div>
 

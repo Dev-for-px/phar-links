@@ -39,11 +39,11 @@
     ev.preventDefault();
     msg($('#c-erro'));
     const empresa = $('#c-empresa').value.trim(), email = $('#c-email').value.trim(), senha = $('#c-senha').value;
-    if (empresa.length < 2) return msg($('#c-erro'), 'Informe o nome da sua empresa.');
+    if (empresa.length === 1) return msg($('#c-erro'), 'Informe o nome completo da empresa.');
     if (!email) return msg($('#c-erro'), 'Informe seu e-mail.');
     if (senha.length < 8) return msg($('#c-erro'), 'A senha precisa ter pelo menos 8 caracteres.');
     enviando($('#c-botao'), async () => {
-      try { localStorage.setItem('pl_empresa', empresa); } catch (e) {}
+      try { if (empresa) localStorage.setItem('pl_empresa', empresa); else localStorage.removeItem('pl_empresa'); } catch (e) {}
       const { data, error } = await db.auth.signUp({ email, password: senha, options: { emailRedirectTo: location.origin + '/app' } });
       if (error) return msg($('#c-erro'), erroBR(error));
       if (data.session) { location.href = '/app'; return; }
