@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Administração · PHAR Links</title>
+<link rel="stylesheet" href="/css/estilo.css">
+</head>
+<body>
+<header class="topo">
+  <strong>PHAR Links · Administração</strong>
+  <nav><a href="/app">Meus links</a><button class="link" id="sair" type="button">Sair</button></nav>
+</header>
+<main class="conteudo">
+  <h2>Empresas</h2>
+  <p>Libere, suspenda ou reative o acesso. Empresa suspensa não entra no sistema e os links dela param de redirecionar.</p>
+  <div id="msg" class="msg"></div>
+  <table>
+    <thead><tr><th>Empresa</th><th>Responsável</th><th>Links</th><th>Cliques</th><th>Desde</th><th>Situação</th></tr></thead>
+    <tbody id="tabela"></tbody>
+  </table>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/admin.js"></script>
+</body>
+</html>

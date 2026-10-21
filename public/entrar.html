@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Entrar · PHAR Links</title>
+<link rel="stylesheet" href="/css/estilo.css">
+</head>
+<body class="centro">
+<main class="cartao">
+  <h1 id="titulo">Entrar</h1>
+  <p id="sub">Acesse seus links curtos.</p>
+  <form id="form">
+    <div id="campo-empresa" class="oculto">
+      <label for="empresa">Nome da empresa</label>
+      <input id="empresa" autocomplete="organization">
+    </div>
+    <label for="email">E-mail</label>
+    <input id="email" type="email" required autocomplete="email">
+    <label for="senha">Senha</label>
+    <input id="senha" type="password" required minlength="6" autocomplete="current-password">
+    <button class="principal largo" id="botao" type="submit">Entrar</button>
+  </form>
+  <div id="msg" class="msg"></div>
+  <p class="msg"><button class="link" id="trocar" type="button">Não tem conta? Criar cadastro</button></p>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/entrar.js"></script>
+</body>
+</html>
