@@ -37,6 +37,18 @@ Mesmo padrão do PHAR Prospector: **Painel**, **Links**, **Equipe** e **Empresa*
 - A lista e a janela de edição mostram **quem criou** cada link (nome da pessoa; "(você)" para os seus). Vem da função `equipe_nomes`.
 - **Excluir**: botão na lista e na edição (só para quem tem a permissão). Abre uma confirmação que só libera o botão depois de marcar "Tenho certeza, quero excluir", avisando que perde o link, os cliques e a observação.
 
+## Painel administrativo (`/admin`)
+Mesmo modelo do PHAR Prospector, só para o admin (as funções `admin_*` conferem no banco).
+- Faixa azul com Aguardando liberação e Empresas ativas (clicar filtra a lista), Usuários e Links no sistema.
+- Gráficos gerais: cliques por dia de todas as empresas (30 dias) e rosca de cliques por empresa (5 maiores + outras).
+- Busca por empresa, razão social, CNPJ/CPF, cidade, ramo, telefone, pessoa ou e-mail. Botão "Limpar filtros".
+- Lista de empresas: dados de cadastro, "Cadastro incompleto", usuários com nome (e quem é o responsável), e-mails autorizados sem cadastro, e-mails não confirmados, data de cadastro, último acesso, links e cliques, situação.
+- Ações: Liberar / Recusar (pendente), Bloquear com confirmação (ativa), Reativar (bloqueada), **Editar** (janela com todos os dados da empresa e a situação) e **Simular**. A sua própria empresa só tem Editar.
+- **Simular:** o admin abre `/app` como se fosse a empresa (vê e edita os links, equipe e cadastro dela), com uma faixa "Modo simular" e o botão "Sair da simulação". Fica em `perfis.simulando`.
+- **Baixar backup (CSV):** todos os links de todas as empresas (empresa, CNPJ, nome, link curto, destino, UTMs, situação, cliques, observação, criado por, data). Abre no Excel.
+- Cada mudança de situação, edição, simulação e backup fica registrada em `private.auditoria`.
+- Na tela `/app`, o admin vê só os links da própria empresa (ou da empresa simulada). A visão de todas as empresas é só no painel admin.
+
 ## Nomes
 - Cada usuário tem nome e sobrenome (`perfis.nome`), mostrado no topo, na Equipe e em "Criado por" no lugar do e-mail.
 - No cadastro (`/entrar`) o nome é obrigatório. Ao autorizar um colaborador, o responsável pode já colocar o nome dele (vale se a pessoa não digitar outro no cadastro).
@@ -55,7 +67,7 @@ Mesmo padrão do PHAR Prospector: **Painel**, **Links**, **Equipe** e **Empresa*
 - `perfis` (um por usuário: e-mail, empresa, papel dono/membro, admin, permissões)
 - `links` (criado_por, observacao, slug único no sistema todo, destino, UTMs, ativo, total de cliques)
 - `cliques_dia` (um registro por link por dia, com o total)
-- Funções: `perfil_nome`, `equipe_nomes`, `empresa_salvar`, `minhas_permissoes`, `equipe_listar`, `equipe_autorizar`, `equipe_permissoes`, `equipe_cancelar_convite`, `equipe_remover`, `empresa_criar` (cadastro da empresa), `resolver_link` (redirecionamento), `private.eu_admin`, `private.minha_empresa_ativa`.
+- Funções: `minha_sessao`, `admin_empresas`, `admin_painel`, `admin_empresa_status`, `admin_empresa_salvar`, `admin_simular`, `admin_exportar`, `perfil_nome`, `equipe_nomes`, `empresa_salvar`, `minhas_permissoes`, `equipe_listar`, `equipe_autorizar`, `equipe_permissoes`, `equipe_cancelar_convite`, `equipe_remover`, `empresa_criar` (cadastro da empresa), `resolver_link` (redirecionamento), `private.eu_admin`, `private.minha_empresa_ativa`.
 - Arquivo para recriar tudo: `supabase/schema-completo.sql`.
 
 ## Segurança
@@ -85,6 +97,7 @@ Mesmo padrão do PHAR Prospector: **Painel**, **Links**, **Equipe** e **Empresa*
 - Cobrança e assinatura; QR Code por link (ideias futuras).
 
 ## Histórico
+- 22/10/2026 — painel admin completo (gráficos, busca, filtros, editar empresa, simular, backup CSV, auditoria); admin deixa de ver links de outras empresas na tela /app.
 - 22/10/2026 — observação por link, "Criado por", excluir com confirmação, nome e sobrenome dos usuários; removido o copiar da URL final.
 - 21/10/2026 — abas Painel (gráficos do Prospector) e Empresa (cadastro completo); permissões ver painel e ver empresa.
 - 21/10/2026 — Equipe com permissões (como no Prospector), opções prontas de UTM e botão para copiar a URL final.

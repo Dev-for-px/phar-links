@@ -8,49 +8,149 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&amp;family=Marcellus&amp;display=swap">
 <link rel="stylesheet" href="/css/estilo.css">
-<title>Painel admin | PHAR Links</title>
+<title>Painel administrativo | PHAR Links</title>
 <meta name="robots" content="noindex">
 </head>
 <body>
 
 <div class="estado" id="tela-carregando"><p class="dica">Carregando…</p></div>
 
+<div class="estado" id="tela-estado" hidden>
+  <p class="eyebrow">PHAR Links</p>
+  <h1 id="estado-titulo"></h1>
+  <p id="estado-texto"></p>
+  <div class="acoes">
+    <a class="btn btn-primary" href="/app">Ir para o sistema</a>
+    <button class="btn btn-sec" type="button" data-sair>Sair</button>
+  </div>
+</div>
+
 <div id="tela-admin" hidden>
+  <div class="simulando" id="faixa-simulando" hidden>
+    <div class="wrap">
+      <p><strong>Modo simular ligado.</strong> Em "Meus links" você está vendo <strong id="simulando-nome"></strong>.</p>
+      <button class="btn btn-sec btn-sm" type="button" id="btn-sair-simulacao">Sair da simulação</button>
+    </div>
+  </div>
+
   <header class="band inverse">
     <div class="wrap">
       <div class="topo">
         <a class="marca" href="/admin"><span>PHAR Links</span><span class="ponto-marca" aria-hidden="true"></span></a>
         <div class="topo-acoes">
-          <span class="topo-nome" id="topo-email"></span>
+          <span class="topo-nome" id="topo-nome"></span>
           <a class="topo-link" href="/app">Meus links</a>
           <button class="topo-link" type="button" data-sair>Sair</button>
         </div>
       </div>
       <div class="band-top">
         <div>
-          <h1>Painel admin</h1>
-          <p class="band-sub">Libere empresas novas e suspenda ou reative o acesso. Empresa suspensa não entra e os links dela param de redirecionar.</p>
+          <h1>Painel administrativo</h1>
+          <p class="band-sub">Todas as empresas que usam o sistema, quem está esperando liberação e quanto cada uma usa.</p>
         </div>
+        <button class="btn btn-fantasma" type="button" id="btn-atualizar">Atualizar</button>
       </div>
-      <div class="stats" role="group" aria-label="Resumo">
-        <div class="stat"><b id="n-pendentes">–</b><span>Aguardando liberação</span></div>
-        <div class="stat"><b id="n-ativas">–</b><span>Empresas liberadas</span></div>
+      <div class="stats" role="group" aria-label="Filtrar por situação da empresa">
+        <button class="stat" type="button" data-filtro="pendente" aria-pressed="false"><b id="n-pendente">–</b><span>Aguardando liberação</span></button>
+        <button class="stat" type="button" data-filtro="ativa" aria-pressed="false"><b id="n-ativa">–</b><span>Empresas ativas</span></button>
+        <div class="stat"><b id="n-usuarios">–</b><span>Usuários</span></div>
         <div class="stat"><b id="n-links">–</b><span>Links no sistema</span></div>
-        <div class="stat"><b id="n-cliques">–</b><span>Cliques no total</span></div>
       </div>
     </div>
   </header>
 
   <main class="wrap sistema">
     <div class="aviso aviso-erro" id="aviso-erro" role="alert" hidden></div>
-    <div class="adm-head lk" aria-hidden="true"><div>Empresa</div><div>Responsável</div><div>Situação</div><div>Links</div><div>Cliques</div><div></div></div>
+
+    <section class="secao-adm" aria-label="Visão geral">
+      <div class="painel-grade">
+        <div class="bloco-graf">
+          <h2>Cliques por dia</h2>
+          <p class="dica">Soma de todas as empresas nos últimos 30 dias.</p>
+          <div id="graf-dias"></div>
+        </div>
+        <div class="bloco-graf">
+          <h2>Cliques por empresa</h2>
+          <p class="dica">Total de cliques de cada empresa desde o início.</p>
+          <div id="graf-empresas"></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="toolbar">
+      <div class="campo busca">
+        <label for="q">Buscar empresa</label>
+        <input type="search" id="q" placeholder="Empresa, CNPJ, cidade, pessoa ou e-mail" autocomplete="off">
+      </div>
+      <button class="btn btn-sec" type="button" id="btn-backup">Baixar backup (CSV)</button>
+    </div>
+    <div class="resumo">
+      <span id="contagem">Carregando empresas…</span>
+      <button class="linkbtn" type="button" id="btn-limpar" hidden>Limpar filtros</button>
+    </div>
+    <div class="adm-head" aria-hidden="true">
+      <span>Empresa</span><span>Usuários</span><span>Cadastro</span><span>Links</span><span>Situação</span><span></span>
+    </div>
     <div class="lista" id="lista"></div>
+    <p class="dica mt-24">"Editar" muda os dados de cadastro da empresa. "Simular" abre o sistema como se você fosse a empresa: você vê e edita os links dela. Cada simulação e edição fica registrada.</p>
   </main>
 </div>
+
+<dialog id="dlg-empresa" aria-labelledby="emp-titulo">
+  <form id="form-empresa" novalidate>
+    <div class="dlg-head">
+      <h2 id="emp-titulo">Editar empresa</h2>
+      <button class="fechar" type="button" id="emp-fechar" aria-label="Fechar">×</button>
+    </div>
+    <div class="dlg-body">
+      <div class="secao">
+        <h3>Dados da empresa</h3>
+        <div class="grid">
+          <div class="campo col-2"><label for="emp-nome">Nome da empresa</label><input type="text" id="emp-nome" maxlength="120"></div>
+          <div class="campo"><label for="emp-razao_social">Razão social</label><input type="text" id="emp-razao_social" maxlength="160"></div>
+          <div class="campo"><label for="emp-documento">CNPJ ou CPF</label><input type="text" id="emp-documento" maxlength="20" placeholder="00.000.000/0000-00"></div>
+          <div class="campo"><label for="emp-segmento">Ramo de atuação</label><input type="text" id="emp-segmento" maxlength="80"></div>
+          <div class="campo"><label for="emp-telefone">Telefone ou WhatsApp</label><input type="tel" id="emp-telefone" maxlength="30"></div>
+          <div class="campo"><label for="emp-email">E-mail comercial</label><input type="email" id="emp-email" maxlength="120"></div>
+          <div class="campo"><label for="emp-site">Site</label><input type="text" id="emp-site" maxlength="200"></div>
+          <div class="campo"><label for="emp-instagram">Instagram</label><input type="text" id="emp-instagram" maxlength="80"></div>
+          <div class="campo col-2"><label for="emp-descricao">O que a empresa faz</label><textarea id="emp-descricao" maxlength="500"></textarea></div>
+        </div>
+      </div>
+      <div class="secao">
+        <h3>Endereço</h3>
+        <div class="grid">
+          <div class="campo"><label for="emp-cep">CEP</label><input type="text" id="emp-cep" maxlength="9" inputmode="numeric" placeholder="00000-000"></div>
+          <div class="campo"><label for="emp-logradouro">Rua ou avenida</label><input type="text" id="emp-logradouro" maxlength="160"></div>
+          <div class="campo"><label for="emp-numero">Número</label><input type="text" id="emp-numero" maxlength="20"></div>
+          <div class="campo"><label for="emp-complemento">Complemento</label><input type="text" id="emp-complemento" maxlength="80"></div>
+          <div class="campo"><label for="emp-bairro">Bairro</label><input type="text" id="emp-bairro" maxlength="80"></div>
+          <div class="campo"><label for="emp-cidade">Cidade</label><input type="text" id="emp-cidade" maxlength="80"></div>
+          <div class="campo"><label for="emp-uf">Estado</label>
+            <select id="emp-uf"><option value="">—</option><option>AC</option><option>AL</option><option>AP</option><option>AM</option><option>BA</option><option>CE</option><option>DF</option><option>ES</option><option>GO</option><option>MA</option><option>MT</option><option>MS</option><option>MG</option><option>PA</option><option>PB</option><option>PR</option><option>PE</option><option>PI</option><option>RJ</option><option>RN</option><option>RS</option><option>RO</option><option>RR</option><option>SC</option><option>SP</option><option>SE</option><option>TO</option></select>
+          </div>
+        </div>
+      </div>
+      <div class="secao">
+        <h3>Situação</h3>
+        <div class="campo"><label for="emp-situacao">Acesso da empresa</label>
+          <select id="emp-situacao"><option value="pendente">Aguardando liberação</option><option value="ativa">Ativa</option><option value="bloqueada">Bloqueada</option></select>
+          <p class="dica">Bloqueada: ninguém da empresa entra e os links dela param de redirecionar.</p>
+        </div>
+      </div>
+      <p class="erro" id="emp-erro" role="alert" hidden></p>
+      <div class="acoes">
+        <button class="btn btn-sec empurra" type="button" id="emp-cancelar">Cancelar</button>
+        <button class="btn btn-primary" type="submit" id="emp-salvar">Salvar</button>
+      </div>
+    </div>
+  </form>
+</dialog>
 
 <p id="toast" role="status" aria-live="polite"></p>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="/js/config.js"></script>
+<script src="/js/graficos.js"></script>
 <script src="/js/admin.js"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@
   const CAMPOS = ['nome', 'slug', 'destino', ...UTMS];
   const num = (n) => Number(n || 0).toLocaleString('pt-BR');
   const diaISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  let links = [], editando = null, empresaId = null, perm = {}, papel = 'dono', empresa = null, porDia = [], visaoAtual = 'painel', carregado = false, nomes = {}, meuNome = '';
+  let links = [], editando = null, empresaId = null, perm = {}, papel = 'dono', empresa = null, porDia = [], visaoAtual = 'painel', carregado = false, simulando = false, nomes = {}, meuNome = '';
   const eq = { dados: null, editando: '', removendo: '' };
 
   // opções prontas de UTM (a pessoa também pode digitar outra)
@@ -30,10 +30,17 @@
     tela('tela-estado');
   }
   $('#estado-atualizar').addEventListener('click', () => location.reload());
+  $('#btn-sair-simulacao').addEventListener('click', async () => {
+    const r = await db.rpc('admin_simular', { alvo: null });
+    if (r.error) return toast('Não deu para sair da simulação. Tente de novo.');
+    location.href = '/admin';
+  });
 
   async function iniciar() {
-    const { data: perfil, error } = await db.from('perfis').select('empresa_id, admin, nome').eq('user_id', session.user.id).single();
-    if (error) return estado('Não foi possível abrir o sistema', erroBR(error));
+    const { data: perfil, error } = await db.rpc('minha_sessao');
+    if (error || !perfil) return estado('Não foi possível abrir o sistema', erroBR(error || 'Sessão não encontrada.'));
+    simulando = !!perfil.simulando;
+    $('#faixa-simulando').hidden = !simulando;
     $('#link-admin').hidden = !perfil.admin;
     $('#topo-email').textContent = perfil.nome || session.user.email;
     if (!perfil.empresa_id) {
@@ -51,12 +58,13 @@
     $('#aba-empresa').hidden = !perm.ver_empresa;
     const { data: emp } = await db.from('empresas').select('*').eq('id', empresaId).single();
     empresa = emp;
-    if (emp.situacao === 'pendente') return estado('Cadastro em análise', `A empresa ${emp.nome} foi cadastrada e está aguardando liberação. Assim que for liberada, clique em "Verificar de novo".`);
-    if (emp.situacao === 'bloqueada') return estado('Acesso suspenso', `O acesso de ${emp.nome} está suspenso e os links não redirecionam. Fale com o suporte da PHAR Consultoria.`);
+    if (simulando) $('#simulando-nome').textContent = emp.nome;
+    if (!simulando && emp.situacao === 'pendente') return estado('Cadastro em análise', `A empresa ${emp.nome} foi cadastrada e está aguardando liberação. Assim que for liberada, clique em "Verificar de novo".`);
+    if (!simulando && emp.situacao === 'bloqueada') return estado('Acesso suspenso', `O acesso de ${emp.nome} está suspenso e os links não redirecionam. Fale com o suporte da PHAR Consultoria.`);
     $('#topo-empresa').textContent = emp.nome;
     tela('tela-app');
     $('#aviso-cadastro').hidden = !(papel === 'dono' && !cadastroCompleto(emp));
-    $('#aviso-nome').hidden = !!meuNome;
+    $('#aviso-nome').hidden = !!meuNome || simulando;
     preencherEmpresa();
     visao(perm.ver_painel ? 'painel' : 'links');
     await carregar();

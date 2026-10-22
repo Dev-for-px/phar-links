@@ -441,3 +441,5 @@ dialog.dlg-pequeno{width:min(480px,calc(100% - 32px))}
 .lk-obs::before{content:"Obs.: ";font-weight:600;color:var(--ink-subtle)}
 .lk-autor{font-size:13px;line-height:18px;color:var(--ink-subtle);margin-top:2px}
 .c-acao.lk-acoes{flex-wrap:wrap}
+/* painel admin do PHAR Links: coluna de ações mais larga (Liberar, Recusar, Editar, Simular) */
+.adm-head,.adm-linha{grid-template-columns:minmax(0,2fr) minmax(0,2fr) minmax(0,1.1fr) 96px minmax(0,0.9fr) 250px}

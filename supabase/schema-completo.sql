@@ -440,3 +440,177 @@ end $$;
 revoke execute on function public.perfil_nome(text, uuid), public.equipe_nomes(), public.equipe_autorizar(text, jsonb, text) from public, anon;
 grant execute on function public.perfil_nome(text, uuid), public.equipe_nomes(), public.equipe_autorizar(text, jsonb, text) to authenticated;
 revoke execute on function public.equipe_autorizar(text, jsonb) from authenticated;
+
+-- =====================================================================
+-- Painel admin completo e modo simular (22/10/2026)
+-- =====================================================================
+alter table public.perfis add column simulando uuid references public.empresas(id) on delete set null;
+
+create table private.auditoria (
+  id bigint generated always as identity primary key,
+  admin_id uuid references auth.users(id) on delete set null,
+  acao text not null,
+  empresa_id uuid references public.empresas(id) on delete set null,
+  detalhe text not null default '',
+  criado_em timestamptz not null default now()
+);
+
+create or replace function private.minha_empresa_ativa() returns uuid
+language sql stable security definer set search_path = '' as
+$$ select case when p.admin and p.simulando is not null then p.simulando
+     else (select e.id from public.empresas e where e.id = p.empresa_id and e.situacao = 'ativa') end
+   from public.perfis p where p.user_id = auth.uid() $$;
+
+create or replace function private.em_simulacao() returns boolean
+language sql stable security definer set search_path = '' as
+$$ select coalesce((select admin and simulando is not null from public.perfis where user_id = auth.uid()), false) $$;
+grant execute on function private.em_simulacao() to authenticated;
+
+create or replace function private.sou_dono() returns boolean
+language sql stable security definer set search_path = '' as
+$$ select coalesce((select papel = 'dono' or (admin and simulando is not null) from public.perfis where user_id = auth.uid()), false) $$;
+
+create or replace function private.pode(p_chave text) returns boolean
+language sql stable security definer set search_path = '' as
+$$ select coalesce((select case when p.papel = 'dono' or (p.admin and p.simulando is not null) then true
+     else (private.permissoes_limpas(p.permissoes) ->> p_chave)::boolean end
+   from public.perfis p where p.user_id = auth.uid()), false) $$;
+
+create or replace function public.minhas_permissoes() returns jsonb
+language sql stable security definer set search_path = '' as
+$$ select jsonb_build_object('papel', case when p.admin and p.simulando is not null then 'dono' else p.papel end, 'permissoes',
+     case when p.papel = 'dono' or (p.admin and p.simulando is not null)
+       then (select jsonb_object_agg(k, true) from jsonb_object_keys(private.permissoes_padrao()) k)
+       else private.permissoes_limpas(p.permissoes) end)
+   from public.perfis p where p.user_id = auth.uid() $$;
+
+create function public.minha_sessao() returns jsonb
+language sql stable security definer set search_path = '' as
+$$ select jsonb_build_object(
+     'nome', p.nome, 'email', p.email, 'admin', p.admin,
+     'simulando', p.admin and p.simulando is not null,
+     'empresa_id', case when p.admin and p.simulando is not null then p.simulando else p.empresa_id end)
+   from public.perfis p where p.user_id = auth.uid() $$;
+
+-- a tela do sistema não mistura empresas para o admin
+alter policy links_ler on public.links using (
+  empresa_id = private.minha_empresa_ativa() and (private.pode('ver_todos') or criado_por = auth.uid()));
+alter policy cliques_ler on public.cliques_dia using (exists (select 1 from public.links l where l.id = link_id
+  and l.empresa_id = private.minha_empresa_ativa()));
+
+create function private.empresa_gravar(v_emp uuid, p jsonb) returns void
+language plpgsql security definer set search_path = '' as
+$$ declare
+  v_nome text := btrim(coalesce(p->>'nome', ''));
+  v_doc text := upper(regexp_replace(coalesce(p->>'documento', ''), '[^0-9A-Za-z]', '', 'g'));
+  v_cep text := regexp_replace(coalesce(p->>'cep', ''), '\D', '', 'g');
+  v_uf text := upper(btrim(coalesce(p->>'uf', '')));
+  v_email text := lower(btrim(coalesce(p->>'email', '')));
+begin
+  if char_length(v_nome) < 2 or char_length(v_nome) > 120 then raise exception 'nome_invalido' using errcode = 'P0001'; end if;
+  if v_doc <> '' and v_doc !~ '^(\d{11}|[A-Z0-9]{12}\d{2})$' then raise exception 'documento_invalido' using errcode = 'P0001'; end if;
+  if v_cep <> '' and v_cep !~ '^\d{8}$' then raise exception 'cep_invalido' using errcode = 'P0001'; end if;
+  if v_uf <> '' and v_uf !~ '^[A-Z]{2}$' then raise exception 'uf_invalida' using errcode = 'P0001'; end if;
+  if v_email <> '' and (v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' or char_length(v_email) > 120) then
+    raise exception 'email_invalido' using errcode = 'P0001'; end if;
+  update public.empresas set
+    nome = v_nome, razao_social = left(btrim(coalesce(p->>'razao_social', '')), 160), documento = v_doc,
+    segmento = left(btrim(coalesce(p->>'segmento', '')), 80), telefone = left(btrim(coalesce(p->>'telefone', '')), 30),
+    email = v_email, site = left(btrim(coalesce(p->>'site', '')), 200), instagram = left(btrim(coalesce(p->>'instagram', '')), 80),
+    cep = v_cep, logradouro = left(btrim(coalesce(p->>'logradouro', '')), 160), numero = left(btrim(coalesce(p->>'numero', '')), 20),
+    complemento = left(btrim(coalesce(p->>'complemento', '')), 80), bairro = left(btrim(coalesce(p->>'bairro', '')), 80),
+    cidade = left(btrim(coalesce(p->>'cidade', '')), 80), uf = v_uf, descricao = left(btrim(coalesce(p->>'descricao', '')), 500),
+    dados_em = now()
+  where id = v_emp;
+end $$;
+revoke execute on function private.empresa_gravar(uuid, jsonb) from public, anon, authenticated;
+
+create or replace function public.empresa_salvar(p jsonb) returns void
+language plpgsql security definer set search_path = '' as
+$$ declare v_emp uuid := private.minha_empresa_ativa(); begin
+  if v_emp is null or not private.sou_dono() then raise exception 'sem_permissao' using errcode = '42501'; end if;
+  perform private.empresa_gravar(v_emp, p);
+end $$;
+
+create function public.admin_empresas() returns jsonb
+language plpgsql stable security definer set search_path = '' as
+$$ declare v_minha uuid; begin
+  if not private.eu_admin() then raise exception 'sem_permissao' using errcode = '42501'; end if;
+  select empresa_id into v_minha from public.perfis where user_id = auth.uid();
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+      'id', e.id, 'nome', e.nome, 'situacao', e.situacao, 'criado_em', e.criado_em, 'propria', e.id = v_minha,
+      'completo', (e.documento <> '' and e.telefone <> '' and e.cidade <> '' and e.uf <> ''),
+      'razao_social', e.razao_social, 'documento', e.documento, 'segmento', e.segmento, 'telefone', e.telefone,
+      'email', e.email, 'site', e.site, 'instagram', e.instagram, 'descricao', e.descricao,
+      'cep', e.cep, 'logradouro', e.logradouro, 'numero', e.numero, 'complemento', e.complemento,
+      'bairro', e.bairro, 'cidade', e.cidade, 'uf', e.uf,
+      'links', (select count(*) from public.links l where l.empresa_id = e.id),
+      'cliques', (select coalesce(sum(l.cliques), 0) from public.links l where l.empresa_id = e.id),
+      'convites', (select count(*) from private.convites c where c.empresa_id = e.id and c.estado = 'pendente'),
+      'ultimo_acesso', (select max(u.last_sign_in_at) from public.perfis p join auth.users u on u.id = p.user_id where p.empresa_id = e.id),
+      'membros', (select coalesce(jsonb_agg(jsonb_build_object('nome', p.nome, 'email', p.email, 'papel', p.papel,
+          'email_confirmado', u.email_confirmed_at is not null) order by (p.papel = 'dono') desc, lower(p.nome)), '[]'::jsonb)
+        from public.perfis p join auth.users u on u.id = p.user_id where p.empresa_id = e.id)
+    ) order by e.criado_em desc), '[]'::jsonb) from public.empresas e);
+end $$;
+
+create function public.admin_painel() returns jsonb
+language plpgsql stable security definer set search_path = '' as
+$$ begin
+  if not private.eu_admin() then raise exception 'sem_permissao' using errcode = '42501'; end if;
+  return jsonb_build_object(
+    'usuarios', (select count(*) from public.perfis where empresa_id is not null),
+    'cliques_dias', (select coalesce(jsonb_agg(jsonb_build_object('dia', d.dia, 'n', d.n) order by d.dia), '[]'::jsonb)
+      from (select dia, sum(total) as n from public.cliques_dia where dia >= current_date - 29 group by dia) d),
+    'por_empresa', (select coalesce(jsonb_agg(jsonb_build_object('nome', x.nome, 'n', x.n) order by x.n desc), '[]'::jsonb)
+      from (select e.nome, sum(l.cliques) as n from public.links l join public.empresas e on e.id = l.empresa_id
+            group by e.nome having sum(l.cliques) > 0) x));
+end $$;
+
+create function public.admin_empresa_status(alvo uuid, novo text) returns void
+language plpgsql security definer set search_path = '' as
+$$ begin
+  if not private.eu_admin() then raise exception 'sem_permissao' using errcode = '42501'; end if;
+  if novo not in ('pendente','ativa','bloqueada') then raise exception 'situacao_invalida' using errcode = 'P0001'; end if;
+  update public.empresas set situacao = novo where id = alvo;
+  if not found then raise exception 'nao_encontrado' using errcode = 'P0001'; end if;
+  insert into private.auditoria(admin_id, acao, empresa_id, detalhe) values (auth.uid(), 'situacao', alvo, novo);
+end $$;
+
+create function public.admin_empresa_salvar(alvo uuid, p jsonb) returns void
+language plpgsql security definer set search_path = '' as
+$$ begin
+  if not private.eu_admin() then raise exception 'sem_permissao' using errcode = '42501'; end if;
+  if not exists (select 1 from public.empresas where id = alvo) then raise exception 'nao_encontrado' using errcode = 'P0001'; end if;
+  perform private.empresa_gravar(alvo, p);
+  insert into private.auditoria(admin_id, acao, empresa_id) values (auth.uid(), 'editar_empresa', alvo);
+end $$;
+
+create function public.admin_simular(alvo uuid default null) returns void
+language plpgsql security definer set search_path = '' as
+$$ begin
+  if not private.eu_admin() then raise exception 'sem_permissao' using errcode = '42501'; end if;
+  if alvo is not null and not exists (select 1 from public.empresas where id = alvo) then
+    raise exception 'nao_encontrado' using errcode = 'P0001'; end if;
+  update public.perfis set simulando = alvo where user_id = auth.uid();
+  insert into private.auditoria(admin_id, acao, empresa_id) values (auth.uid(), case when alvo is null then 'sair_simulacao' else 'simular' end, alvo);
+end $$;
+
+create function public.admin_exportar() returns jsonb
+language plpgsql security definer set search_path = '' as
+$$ begin
+  if not private.eu_admin() then raise exception 'sem_permissao' using errcode = '42501'; end if;
+  insert into private.auditoria(admin_id, acao) values (auth.uid(), 'exportar');
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+      'empresa', e.nome, 'documento', e.documento, 'nome', l.nome, 'slug', l.slug, 'destino', l.destino,
+      'utm_source', l.utm_source, 'utm_medium', l.utm_medium, 'utm_campaign', l.utm_campaign,
+      'utm_term', l.utm_term, 'utm_content', l.utm_content, 'ativo', l.ativo, 'cliques', l.cliques,
+      'observacao', l.observacao, 'criado_por', (select coalesce(nullif(p.nome, ''), p.email) from public.perfis p where p.user_id = l.criado_por),
+      'criado_em', l.criado_em) order by lower(e.nome), l.criado_em), '[]'::jsonb)
+    from public.links l join public.empresas e on e.id = l.empresa_id);
+end $$;
+
+revoke execute on function public.minha_sessao(), public.admin_empresas(), public.admin_painel(), public.admin_empresa_status(uuid, text),
+  public.admin_empresa_salvar(uuid, jsonb), public.admin_simular(uuid), public.admin_exportar() from public, anon;
+grant execute on function public.minha_sessao(), public.admin_empresas(), public.admin_painel(), public.admin_empresa_status(uuid, text),
+  public.admin_empresa_salvar(uuid, jsonb), public.admin_simular(uuid), public.admin_exportar() to authenticated;
