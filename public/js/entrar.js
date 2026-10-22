@@ -38,13 +38,14 @@
   $('#form-criar').addEventListener('submit', (ev) => {
     ev.preventDefault();
     msg($('#c-erro'));
-    const empresa = $('#c-empresa').value.trim(), email = $('#c-email').value.trim(), senha = $('#c-senha').value;
+    const nome = $('#c-nome').value.trim(), empresa = $('#c-empresa').value.trim(), email = $('#c-email').value.trim(), senha = $('#c-senha').value;
+    if (nome.length < 2) return msg($('#c-erro'), 'Informe seu nome e sobrenome.');
     if (empresa.length === 1) return msg($('#c-erro'), 'Informe o nome completo da empresa.');
     if (!email) return msg($('#c-erro'), 'Informe seu e-mail.');
     if (senha.length < 8) return msg($('#c-erro'), 'A senha precisa ter pelo menos 8 caracteres.');
     enviando($('#c-botao'), async () => {
       try { if (empresa) localStorage.setItem('pl_empresa', empresa); else localStorage.removeItem('pl_empresa'); } catch (e) {}
-      const { data, error } = await db.auth.signUp({ email, password: senha, options: { emailRedirectTo: location.origin + '/app' } });
+      const { data, error } = await db.auth.signUp({ email, password: senha, options: { emailRedirectTo: location.origin + '/app', data: { nome } } });
       if (error) return msg($('#c-erro'), erroBR(error));
       if (data.session) { location.href = '/app'; return; }
       aviso('Confirme seu e-mail', `Enviamos um link de confirmação para ${email}. Abra o e-mail, clique no link e você volta para cá já com a conta criada.`);

@@ -434,3 +434,10 @@ section.suave{background:var(--surface-soft)}
 .lk-previa-caixa .lk-previa{flex:1;min-width:0;margin:0}
 .lk-previa-caixa .btn{flex:none;min-height:auto}
 .aba-app[hidden]{display:none}
+
+dialog.dlg-pequeno{width:min(480px,calc(100% - 32px))}
+.dlg-pequeno .dlg-body{gap:16px}
+.lk-obs{font-size:13px;line-height:18px;color:var(--ink-muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lk-obs::before{content:"Obs.: ";font-weight:600;color:var(--ink-subtle)}
+.lk-autor{font-size:13px;line-height:18px;color:var(--ink-subtle);margin-top:2px}
+.c-acao.lk-acoes{flex-wrap:wrap}

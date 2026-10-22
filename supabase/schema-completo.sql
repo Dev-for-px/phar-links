@@ -362,3 +362,81 @@ begin
 end $$;
 revoke execute on function public.empresa_salvar(jsonb) from public, anon;
 grant execute on function public.empresa_salvar(jsonb) to authenticated;
+
+-- =====================================================================
+-- Nomes dos usuários e observação dos links (22/10/2026)
+-- =====================================================================
+alter table public.perfis add column nome text not null default '' check (char_length(nome) <= 120);
+alter table private.convites add column nome text not null default '' check (char_length(nome) <= 120);
+alter table public.links add column observacao text not null default '' check (char_length(observacao) <= 1000);
+
+create or replace function private.novo_usuario() returns trigger
+language plpgsql security definer set search_path = '' as
+$$ declare c private.convites; v_nome text := left(btrim(coalesce(new.raw_user_meta_data->>'nome', '')), 120); begin
+  select * into c from private.convites where email = lower(new.email) and estado = 'pendente';
+  if found then
+    insert into public.perfis(user_id, email, nome, empresa_id, papel, permissoes)
+    values (new.id, new.email, coalesce(nullif(v_nome, ''), c.nome), c.empresa_id, 'membro', private.permissoes_limpas(c.permissoes));
+    update private.convites set estado = 'aceito' where id = c.id;
+  else
+    insert into public.perfis(user_id, email, nome, admin)
+    values (new.id, new.email, v_nome, lower(new.email) = 'pedrodadila@gmail.com');
+  end if;
+  return new; end $$;
+
+create function public.perfil_nome(p_nome text, p_usuario uuid default null) returns void
+language plpgsql security definer set search_path = '' as
+$$ declare v_alvo uuid := coalesce(p_usuario, auth.uid()); v_nome text := left(btrim(coalesce(p_nome, '')), 120); begin
+  if auth.uid() is null then raise exception 'sem_permissao' using errcode = '42501'; end if;
+  if char_length(v_nome) < 2 then raise exception 'nome_invalido' using errcode = 'P0001'; end if;
+  if v_alvo <> auth.uid() and not (private.sou_dono() and exists (
+      select 1 from public.perfis where user_id = v_alvo and empresa_id = private.minha_empresa_ativa())) then
+    raise exception 'sem_permissao' using errcode = '42501'; end if;
+  update public.perfis set nome = v_nome where user_id = v_alvo;
+end $$;
+
+create function public.equipe_nomes() returns jsonb
+language sql stable security definer set search_path = '' as
+$$ select coalesce(jsonb_object_agg(p.user_id, coalesce(nullif(p.nome, ''), p.email)), '{}'::jsonb)
+   from public.perfis p where p.empresa_id = private.minha_empresa_ativa() $$;
+
+create or replace function public.equipe_listar() returns jsonb
+language plpgsql stable security definer set search_path = '' as
+$$ declare v_emp uuid := private.minha_empresa_ativa(); v_dono boolean := private.sou_dono(); begin
+  if v_emp is null then raise exception 'sem_permissao' using errcode = '42501'; end if;
+  return jsonb_build_object(
+    'membros', (select coalesce(jsonb_agg(jsonb_build_object(
+        'id', p.user_id, 'nome', p.nome, 'email', p.email, 'papel', p.papel, 'ultimo_acesso', u.last_sign_in_at,
+        'permissoes', case when v_dono and p.papel <> 'dono' then private.permissoes_limpas(p.permissoes) end)
+        order by (p.papel = 'dono') desc, lower(coalesce(nullif(p.nome, ''), p.email))), '[]'::jsonb)
+      from public.perfis p join auth.users u on u.id = p.user_id
+      where p.empresa_id = v_emp and (private.pode('ver_equipe') or p.user_id = auth.uid())),
+    'convites', case when v_dono then (select coalesce(jsonb_agg(jsonb_build_object(
+        'id', c.id, 'nome', c.nome, 'email', c.email, 'criado_em', c.criado_em, 'permissoes', private.permissoes_limpas(c.permissoes))
+        order by c.criado_em), '[]'::jsonb) from private.convites c where c.empresa_id = v_emp and c.estado = 'pendente') else '[]'::jsonb end,
+    'pode_gerenciar', v_dono,
+    'padrao', private.permissoes_padrao());
+end $$;
+
+-- substitui a versão de 2 parâmetros (ao recriar do zero, pular a criação dela acima ou remover depois)
+create or replace function public.equipe_autorizar(p_email text, p_permissoes jsonb, p_nome text default '') returns void
+language plpgsql security definer set search_path = '' as
+$$ declare v_emp uuid := private.minha_empresa_ativa(); v_email text := lower(btrim(p_email)); begin
+  if v_emp is null or not private.sou_dono() then raise exception 'sem_permissao' using errcode = '42501'; end if;
+  if v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'email_invalido' using errcode = 'P0001'; end if;
+  if exists (select 1 from public.perfis where lower(email) = v_email and empresa_id = v_emp) then
+    raise exception 'ja_membro' using errcode = 'P0001'; end if;
+  if exists (select 1 from public.perfis where lower(email) = v_email) then
+    raise exception 'ja_cadastrado' using errcode = 'P0001'; end if;
+  if exists (select 1 from private.convites where email = v_email and estado = 'pendente') then
+    raise exception 'ja_autorizado' using errcode = 'P0001'; end if;
+  if (select count(*) from public.perfis where empresa_id = v_emp)
+     + (select count(*) from private.convites where empresa_id = v_emp and estado = 'pendente') >= 20 then
+    raise exception 'limite_equipe' using errcode = 'P0001'; end if;
+  insert into private.convites(empresa_id, email, nome, permissoes)
+  values (v_emp, v_email, left(btrim(coalesce(p_nome, '')), 120), private.permissoes_limpas(p_permissoes));
+end $$;
+
+revoke execute on function public.perfil_nome(text, uuid), public.equipe_nomes(), public.equipe_autorizar(text, jsonb, text) from public, anon;
+grant execute on function public.perfil_nome(text, uuid), public.equipe_nomes(), public.equipe_autorizar(text, jsonb, text) to authenticated;
+revoke execute on function public.equipe_autorizar(text, jsonb) from authenticated;

@@ -4,7 +4,7 @@
   const CAMPOS = ['nome', 'slug', 'destino', ...UTMS];
   const num = (n) => Number(n || 0).toLocaleString('pt-BR');
   const diaISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  let links = [], editando = null, empresaId = null, perm = {}, papel = 'dono', empresa = null, porDia = [], visaoAtual = 'painel', carregado = false;
+  let links = [], editando = null, empresaId = null, perm = {}, papel = 'dono', empresa = null, porDia = [], visaoAtual = 'painel', carregado = false, nomes = {}, meuNome = '';
   const eq = { dados: null, editando: '', removendo: '' };
 
   // opções prontas de UTM (a pessoa também pode digitar outra)
@@ -32,10 +32,10 @@
   $('#estado-atualizar').addEventListener('click', () => location.reload());
 
   async function iniciar() {
-    const { data: perfil, error } = await db.from('perfis').select('empresa_id, admin').eq('user_id', session.user.id).single();
+    const { data: perfil, error } = await db.from('perfis').select('empresa_id, admin, nome').eq('user_id', session.user.id).single();
     if (error) return estado('Não foi possível abrir o sistema', erroBR(error));
     $('#link-admin').hidden = !perfil.admin;
-    $('#topo-email').textContent = session.user.email;
+    $('#topo-email').textContent = perfil.nome || session.user.email;
     if (!perfil.empresa_id) {
       try { $('#nova-empresa').value = localStorage.getItem('pl_empresa') || ''; } catch (e) {}
       // cadastro feito em /entrar: envia o nome da empresa sozinho
@@ -43,6 +43,7 @@
       return tela('tela-sem-empresa');
     }
     empresaId = perfil.empresa_id;
+    meuNome = perfil.nome || '';
     const mp = await db.rpc('minhas_permissoes');
     if (mp.data) { perm = mp.data.permissoes || {}; papel = mp.data.papel; }
     $('#aba-painel').hidden = !perm.ver_painel;
@@ -55,6 +56,7 @@
     $('#topo-empresa').textContent = emp.nome;
     tela('tela-app');
     $('#aviso-cadastro').hidden = !(papel === 'dono' && !cadastroCompleto(emp));
+    $('#aviso-nome').hidden = !!meuNome;
     preencherEmpresa();
     visao(perm.ver_painel ? 'painel' : 'links');
     await carregar();
@@ -77,10 +79,12 @@
   async function carregar() {
     msg($('#aviso-erro'));
     const ini = new Date(); ini.setDate(ini.getDate() - 29);
-    const [r, rd] = await Promise.all([
+    const [r, rd, rn] = await Promise.all([
       db.from('links').select('*').order('criado_em', { ascending: false }),
-      db.from('cliques_dia').select('link_id, dia, total').gte('dia', diaISO(ini))
+      db.from('cliques_dia').select('link_id, dia, total').gte('dia', diaISO(ini)),
+      db.rpc('equipe_nomes')
     ]);
+    nomes = rn.data || {};
     if (r.error) return msg($('#aviso-erro'), erroBR(r.error));
     links = r.data;
     $('#n-ativos').textContent = num(links.filter(l => l.ativo).length);
@@ -118,7 +122,7 @@
     lista.replaceChildren();
     const vis = links.filter(l =>
       (!f || (f === 'ativos' ? l.ativo : !l.ativo)) &&
-      (!q || [l.nome, l.slug, l.destino].some(v => v.toLowerCase().includes(q))));
+      (!q || [l.nome, l.slug, l.destino, l.observacao || '', autor(l)].some(v => v.toLowerCase().includes(q))));
     $('#resumo').textContent = links.length ? `${num(vis.length)} de ${num(links.length)} links` : '';
     $('.lista-head').hidden = !vis.length;
 
@@ -143,10 +147,11 @@
       const cNome = el('div', 'c-nome');
       const nome = el('button', 'nome', l.nome); nome.type = 'button';
       nome.addEventListener('click', () => abrir(l));
-      cNome.append(nome, el('div', 'lk-curto', `${dominio}/${l.slug}`));
+      cNome.append(nome, el('div', 'lk-curto', `${dominio}/${l.slug}`), el('div', 'lk-autor', 'Criado por ' + autor(l)));
       const cDest = el('div', 'c-local');
       const d = el('div', 'lk-destino', urlFinal(l)); d.title = urlFinal(l);
       cDest.append(d);
+      if (l.observacao) { const o = el('div', 'lk-obs', l.observacao); o.title = l.observacao; cDest.append(o); }
       const cSit = el('div', 'c-status');
       cSit.append(el('span', 'tag ' + (l.ativo ? 'c-ativa' : 'c-pendente'), l.ativo ? 'Ativo' : 'Pausado'));
       const cNum = el('div', 'c-prox lk-num', num(l.cliques));
@@ -160,9 +165,19 @@
       const editar = el('button', 'btn btn-primary btn-sm', perm.editar ? 'Editar' : 'Ver'); editar.type = 'button';
       editar.addEventListener('click', () => abrir(l));
       cAcao.append(copiar, editar);
+      if (perm.excluir) {
+        const exc = el('button', 'btn btn-danger btn-sm', 'Excluir'); exc.type = 'button';
+        exc.addEventListener('click', () => pedirExclusao(l));
+        cAcao.append(exc);
+      }
       linha.append(cNome, cDest, cSit, cNum, cAcao);
       return linha;
     }
+  }
+  function autor(l) {
+    if (!l.criado_por) return '—';
+    if (l.criado_por === session.user.id) return meuNome ? meuNome + ' (você)' : 'você';
+    return nomes[l.criado_por] || 'alguém que saiu da equipe';
   }
   $('#busca').addEventListener('input', desenhar);
   $('#filtro').addEventListener('change', desenhar);
@@ -175,17 +190,12 @@
     CAMPOS.forEach(c => { const v = $('#f-' + c).value.trim(); l[c] = v || null; });
     if (l.slug) l.slug = l.slug.toLowerCase();
     if (l.destino && !/^https?:\/\//i.test(l.destino)) l.destino = 'https://' + l.destino;
+    l.observacao = $('#f-observacao').value.trim();
     l.ativo = $('#f-ativo').checked;
     return l;
   }
   function previa() { const l = lerForm(); $('#f-previa').textContent = l.destino ? urlFinal(l) : '—'; }
   $('#form-link').addEventListener('input', previa);
-  $('#btn-copiar-final').addEventListener('click', async () => {
-    const l = lerForm();
-    if (!l.destino) return toast('Preencha o destino primeiro.');
-    try { await navigator.clipboard.writeText(urlFinal(l)); toast('URL com as UTMs copiada.'); }
-    catch (e) { toast('Não foi possível copiar. Selecione o texto e copie manualmente.'); }
-  });
 
   const sugerido = (t) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
   $('#f-nome').addEventListener('input', () => {
@@ -199,6 +209,9 @@
     $('#dlg-titulo').textContent = l ? l.nome : 'Novo link';
     CAMPOS.forEach(c => { $('#f-' + c).value = (l && l[c]) || ''; });
     $('#f-ativo').checked = l ? l.ativo : true;
+    $('#f-observacao').value = (l && l.observacao) || '';
+    $('#f-autor').hidden = !l;
+    if (l) $('#f-autor').textContent = 'Criado por ' + autor(l) + ' em ' + new Date(l.criado_em).toLocaleDateString('pt-BR') + '.';
     delete $('#f-slug').dataset.mexido;
     $('#btn-excluir').hidden = !l || !perm.excluir;
     $('#btn-salvar').hidden = !!l && !perm.editar;
@@ -254,14 +267,55 @@
     carregar();
   });
 
-  $('#btn-excluir').addEventListener('click', async () => {
-    if (!editando) return;
-    if (!confirm(`Excluir o link "${editando.nome}"? Quem clicar em ${dominio}/${editando.slug} vai ver "link não encontrado". Para só pausar, desmarque "Link ativo".`)) return;
-    const { error } = await db.from('links').delete().eq('id', editando.id);
-    if (error) return msg($('#erro-link'), erroBR(error));
-    fechar();
+  // ---------- excluir (com confirmação) ----------
+  let excluindo = null;
+  function pedirExclusao(l) {
+    excluindo = l;
+    $('#exc-texto').textContent = `Você vai excluir "${l.nome}" (${dominio}/${l.slug}), que já teve ${num(l.cliques)} clique(s).`;
+    $('#exc-certeza').checked = false;
+    $('#exc-confirmar').disabled = true;
+    if ($('#dlg-link').open) fechar();
+    $('#dlg-excluir').showModal();
+  }
+  $('#btn-excluir').addEventListener('click', () => { if (editando) pedirExclusao(editando); });
+  $('#exc-certeza').addEventListener('change', () => { $('#exc-confirmar').disabled = !$('#exc-certeza').checked; });
+  $('#exc-cancelar').addEventListener('click', () => $('#dlg-excluir').close());
+  $('#exc-confirmar').addEventListener('click', async () => {
+    if (!excluindo || !$('#exc-certeza').checked) return;
+    $('#exc-confirmar').disabled = true;
+    const { error } = await db.from('links').delete().eq('id', excluindo.id);
+    if (error) { $('#exc-confirmar').disabled = false; return toast(erroBR(error)); }
+    $('#dlg-excluir').close();
     toast('Link excluído.');
+    excluindo = null;
     carregar();
+  });
+
+  // ---------- nome (próprio ou de alguém da equipe) ----------
+  let nomeDe = null;
+  function editarNome(id, atual) {
+    nomeDe = id;
+    $('#nome-titulo').textContent = id === session.user.id ? 'Seu nome' : 'Nome do colaborador';
+    $('#nome-campo').value = atual || '';
+    msg($('#nome-erro'));
+    $('#dlg-nome').showModal();
+    $('#nome-campo').focus();
+  }
+  $('#btn-meu-nome').addEventListener('click', () => editarNome(session.user.id, meuNome));
+  $('#nome-cancelar').addEventListener('click', () => $('#dlg-nome').close());
+  $('#form-nome').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const v = $('#nome-campo').value.trim();
+    if (v.length < 2) return msg($('#nome-erro'), 'Informe o nome e sobrenome.');
+    $('#nome-salvar').disabled = true;
+    const r = await db.rpc('perfil_nome', { p_nome: v, p_usuario: nomeDe });
+    $('#nome-salvar').disabled = false;
+    if (r.error) return msg($('#nome-erro'), r.error.message === 'sem_permissao' ? 'Só o responsável pela conta pode mudar o nome de outra pessoa.' : erroBR(r.error));
+    if (nomeDe === session.user.id) { meuNome = v; $('#topo-email').textContent = v; $('#aviso-nome').hidden = true; }
+    $('#dlg-nome').close();
+    toast('Nome salvo.');
+    carregar();
+    if (visaoAtual === 'equipe') carregarEquipe();
   });
 
   // ---------- abas ----------
@@ -486,7 +540,9 @@
       }
       membros.append(h('div', { class: 'eq-linha' },
         h('div', null,
-          h('div', { class: 'nome' }, m.email, eu ? ' (você)' : '', h('span', { class: 'tag tag-papel', text: m.papel === 'dono' ? 'Responsável' : 'Colaborador' })),
+          h('div', { class: 'nome' }, m.nome || m.email, eu ? ' (você)' : '', h('span', { class: 'tag tag-papel', text: m.papel === 'dono' ? 'Responsável' : 'Colaborador' })),
+          m.nome ? h('div', { class: 'sub', text: m.email }) : null,
+          (eu || (d.pode_gerenciar && m.papel !== 'dono')) ? h('button', { class: 'linkbtn', type: 'button', text: m.nome ? 'Mudar nome' : 'Colocar nome', onclick: () => editarNome(m.id, m.nome) }) : null,
           h('div', { class: 'sub', text: m.ultimo_acesso ? 'Último acesso em ' + dataBR(m.ultimo_acesso) : 'Ainda não entrou' }),
           m.papel === 'dono' ? (d.pode_gerenciar ? h('div', { class: 'eq-perm-resumo', text: 'Vê e pode tudo.' }) : null)
             : m.permissoes ? h('div', { class: 'eq-perm-resumo', text: resumo(m.permissoes) }) : null),
@@ -505,7 +561,7 @@
       for (const c of d.convites) {
         const editando = eq.editando === 'c' + c.id;
         convites.append(h('div', { class: 'eq-linha' },
-          h('div', null, h('div', { class: 'sub', text: c.email }), h('div', { class: 'sub', text: 'Autorizado em ' + dataBR(c.criado_em) }),
+          h('div', null, h('div', { class: 'nome', text: c.nome || c.email }), c.nome ? h('div', { class: 'sub', text: c.email }) : null, h('div', { class: 'sub', text: 'Autorizado em ' + dataBR(c.criado_em) }),
             h('div', { class: 'eq-perm-resumo', text: resumo(c.permissoes) })),
           h('div', { class: 'eq-acoes' },
             h('button', { class: 'btn btn-sec btn-sm', type: 'button', text: 'Permissões', 'aria-expanded': String(editando), onclick: () => { eq.editando = editando ? '' : 'c' + c.id; desenharEquipe(); } }),
@@ -531,10 +587,10 @@
     const email = $('#eq-email').value.trim().toLowerCase(), err = $('#eq-erro'), btn = $('#eq-convidar');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return msg(err, ERROS_EQUIPE.email_invalido);
     msg(err); btn.disabled = true;
-    const r = await db.rpc('equipe_autorizar', { p_email: email, p_permissoes: lerPerms($('#eq-perms-novo')) });
+    const r = await db.rpc('equipe_autorizar', { p_email: email, p_permissoes: lerPerms($('#eq-perms-novo')), p_nome: $('#eq-nome').value.trim() });
     btn.disabled = false;
     if (r.error) return msg(err, erroEquipe(r.error));
-    $('#eq-email').value = ''; $('#eq-perms-novo').replaceChildren();
+    $('#eq-email').value = ''; $('#eq-nome').value = ''; $('#eq-perms-novo').replaceChildren();
     toast('E-mail autorizado. Peça para a pessoa criar a conta.');
     carregarEquipe();
   });

@@ -32,9 +32,19 @@ Mesmo padrão do PHAR Prospector: **Painel**, **Links**, **Equipe** e **Empresa*
 - O responsável muda permissões, cancela autorizações e remove pessoas (os links criados por ela continuam na empresa). Limite de 20 pessoas por empresa.
 - Convites ficam em `private.convites` com situação pendente/aceito/cancelado (não são apagados).
 
+## Links: observação, autor e exclusão
+- Cada link tem um campo **Observação** (até 1.000 caracteres), que aparece na lista embaixo do destino e entra na busca.
+- A lista e a janela de edição mostram **quem criou** cada link (nome da pessoa; "(você)" para os seus). Vem da função `equipe_nomes`.
+- **Excluir**: botão na lista e na edição (só para quem tem a permissão). Abre uma confirmação que só libera o botão depois de marcar "Tenho certeza, quero excluir", avisando que perde o link, os cliques e a observação.
+
+## Nomes
+- Cada usuário tem nome e sobrenome (`perfis.nome`), mostrado no topo, na Equipe e em "Criado por" no lugar do e-mail.
+- No cadastro (`/entrar`) o nome é obrigatório. Ao autorizar um colaborador, o responsável pode já colocar o nome dele (vale se a pessoa não digitar outro no cadastro).
+- A própria pessoa muda o nome dela, e o responsável muda o de qualquer colaborador, pelo "Mudar nome" na Equipe (`perfil_nome`). Quem está sem nome vê um aviso no Painel.
+
 ## UTMs
 - Cada campo de UTM tem uma lista de opções prontas (instagram, facebook, google, whatsapp, cpc, social, bio etc.) e também os valores já usados nos links da empresa. Dá para escolher da lista ou digitar outro.
-- A URL final ("Vai abrir") tem botão Copiar, para usar o link completo com UTM sem o encurtador.
+- A URL final aparece em "Vai abrir" antes de salvar (sem botão de copiar).
 
 ## Visual
 - Mesma base visual do PHAR Prospector (Design System da PHAR Consultoria): `public/css/estilo.css` copiado de lá, com um bloco "PHAR Links" no fim; `public/js/grade.js` (grade de pontos) e `public/favicon.svg` também vêm de lá.
@@ -43,9 +53,9 @@ Mesmo padrão do PHAR Prospector: **Painel**, **Links**, **Equipe** e **Empresa*
 ## Banco
 - `empresas` (nome, situação: pendente/ativa/bloqueada, e o cadastro: razão social, documento, contatos, endereço, `dados_em`)
 - `perfis` (um por usuário: e-mail, empresa, papel dono/membro, admin, permissões)
-- `links` (criado_por, slug único no sistema todo, destino, UTMs, ativo, total de cliques)
+- `links` (criado_por, observacao, slug único no sistema todo, destino, UTMs, ativo, total de cliques)
 - `cliques_dia` (um registro por link por dia, com o total)
-- Funções: `empresa_salvar`, `minhas_permissoes`, `equipe_listar`, `equipe_autorizar`, `equipe_permissoes`, `equipe_cancelar_convite`, `equipe_remover`, `empresa_criar` (cadastro da empresa), `resolver_link` (redirecionamento), `private.eu_admin`, `private.minha_empresa_ativa`.
+- Funções: `perfil_nome`, `equipe_nomes`, `empresa_salvar`, `minhas_permissoes`, `equipe_listar`, `equipe_autorizar`, `equipe_permissoes`, `equipe_cancelar_convite`, `equipe_remover`, `empresa_criar` (cadastro da empresa), `resolver_link` (redirecionamento), `private.eu_admin`, `private.minha_empresa_ativa`.
 - Arquivo para recriar tudo: `supabase/schema-completo.sql`.
 
 ## Segurança
@@ -68,12 +78,14 @@ Mesmo padrão do PHAR Prospector: **Painel**, **Links**, **Equipe** e **Empresa*
 4. No Supabase (Authentication → URL Configuration): Site URL `https://links.pharconsultoria.com` e Redirect URL `https://links.pharconsultoria.com/**`.
 
 ## Pendências
+- Limpeza: versão antiga `public.equipe_autorizar(text, jsonb)` ficou sem permissão de uso. Para remover: `drop function public.equipe_autorizar(text, jsonb);` no SQL Editor.
 - Site URL e Redirect URLs do login no Supabase (passo 4 acima) — conferir.
 - E-mail próprio (SMTP) antes de abrir para muitos clientes: o e-mail embutido do Supabase manda poucas mensagens por hora.
 - Limpeza: a função antiga `public.resolver(text)` ficou no banco sem permissão de uso. Para remover, rodar no SQL Editor: `drop function public.resolver(text);`
 - Cobrança e assinatura; QR Code por link (ideias futuras).
 
 ## Histórico
+- 22/10/2026 — observação por link, "Criado por", excluir com confirmação, nome e sobrenome dos usuários; removido o copiar da URL final.
 - 21/10/2026 — abas Painel (gráficos do Prospector) e Empresa (cadastro completo); permissões ver painel e ver empresa.
 - 21/10/2026 — Equipe com permissões (como no Prospector), opções prontas de UTM e botão para copiar a URL final.
 - 21/10/2026 — telas no padrão do PHAR Prospector, página inicial e recuperação de senha.

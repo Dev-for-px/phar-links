@@ -79,6 +79,10 @@
         <p><strong>Complete o cadastro da empresa.</strong> Faltam dados como CNPJ, telefone e cidade.</p>
         <button class="btn btn-sec btn-sm" type="button" id="btn-completar">Completar cadastro</button>
       </div>
+      <div class="aviso aviso-info" id="aviso-nome" hidden>
+        <p><strong>Coloque seu nome.</strong> Ele aparece para a equipe no lugar do e-mail e em cada link que você criar.</p>
+        <button class="btn btn-sec btn-sm" type="button" id="btn-meu-nome">Colocar meu nome</button>
+      </div>
       <div id="painel-vazio" hidden></div>
       <div id="painel-conteudo" hidden>
         <div class="painel-grade">
@@ -112,7 +116,7 @@
       </div>
     </div>
     <div class="resumo" id="resumo"></div>
-    <div class="lista-head" aria-hidden="true"><div>Link</div><div>Destino</div><div>Situação</div><div>Cliques</div><div></div></div>
+    <div class="lista-head" aria-hidden="true"><div>Link</div><div>Destino e observação</div><div>Situação</div><div>Cliques</div><div></div></div>
     <div class="lista" id="lista"></div>
     </section>
 
@@ -128,6 +132,7 @@
           <h2>Adicionar colaborador</h2>
           <p class="dica">Informe o e-mail da pessoa. Depois peça para ela criar a conta na página de entrada usando esse mesmo e-mail: ela entra direto na sua equipe. O sistema não envia o convite por e-mail.</p>
           <form class="eq-novo" id="form-convite" novalidate>
+            <div class="campo"><label for="eq-nome">Nome e sobrenome</label><input type="text" id="eq-nome" maxlength="120" autocomplete="off" placeholder="Ex.: Maria Souza"></div>
             <div class="campo"><label for="eq-email">E-mail do colaborador</label><input type="email" id="eq-email" maxlength="120" autocomplete="off"></div>
             <div id="eq-perms-novo"></div>
             <p class="erro" id="eq-erro" role="alert" hidden></p>
@@ -254,10 +259,9 @@
         </div>
         <p class="dica">Escolha uma opção pronta da lista ou digite outra.</p>
         <datalist id="op-utm_source"></datalist><datalist id="op-utm_medium"></datalist><datalist id="op-utm_campaign"></datalist><datalist id="op-utm_content"></datalist><datalist id="op-utm_term"></datalist>
-        <div class="lk-previa-caixa">
-          <p class="lk-previa"><b>Vai abrir:</b> <span id="f-previa">—</span></p>
-          <button class="btn btn-sec btn-sm" type="button" id="btn-copiar-final">Copiar</button>
-        </div>
+        <p class="lk-previa"><b>Vai abrir:</b> <span id="f-previa">—</span></p>
+        <div class="campo"><label for="f-observacao">Observação (opcional)</label><textarea id="f-observacao" maxlength="1000" placeholder="Ex.: link da bio até o fim da campanha; depois trocar para a página de Natal."></textarea><p class="dica">Só a equipe vê. Serve para lembrar para que o link está sendo usado.</p></div>
+        <p class="dica" id="f-autor" hidden></p>
         <label class="caixa"><input type="checkbox" id="f-ativo" checked><span>Link ativo<small>Desmarque para pausar sem apagar.</small></span></label>
       </div>
 
@@ -272,6 +276,33 @@
         <button class="btn btn-danger" type="button" id="btn-excluir" hidden>Excluir</button>
         <button class="btn btn-sec empurra" type="button" id="btn-cancelar">Cancelar</button>
         <button class="btn btn-primary" type="submit" id="btn-salvar">Salvar</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-excluir" class="dlg-pequeno" aria-labelledby="exc-titulo">
+  <div class="dlg-head"><h2 id="exc-titulo">Excluir este link?</h2></div>
+  <div class="dlg-body">
+    <p id="exc-texto"></p>
+    <div class="caixa-info"><p><strong>Isso não pode ser desfeito.</strong> Você vai perder o link curto, o histórico de cliques e a observação. Quem clicar nele vai ver "link não encontrado".</p><p>Se quiser só parar o link por um tempo, abra "Editar" e desmarque "Link ativo".</p></div>
+    <label class="caixa"><input type="checkbox" id="exc-certeza"><span>Tenho certeza, quero excluir</span></label>
+    <div class="acoes">
+      <button class="btn btn-sec empurra" type="button" id="exc-cancelar">Cancelar</button>
+      <button class="btn btn-danger" type="button" id="exc-confirmar" disabled>Excluir link</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlg-nome" class="dlg-pequeno" aria-labelledby="nome-titulo">
+  <form id="form-nome" novalidate>
+    <div class="dlg-head"><h2 id="nome-titulo">Nome</h2></div>
+    <div class="dlg-body">
+      <div class="campo"><label for="nome-campo">Nome e sobrenome</label><input type="text" id="nome-campo" maxlength="120" autocomplete="name"></div>
+      <p class="erro" id="nome-erro" role="alert" hidden></p>
+      <div class="acoes">
+        <button class="btn btn-sec empurra" type="button" id="nome-cancelar">Cancelar</button>
+        <button class="btn btn-primary" type="submit" id="nome-salvar">Salvar</button>
       </div>
     </div>
   </form>
